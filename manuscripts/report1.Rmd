@@ -1,0 +1,47 @@
+---
+title: "Crosssvalidation Meeting, Tokyo 21st 26th Janurary 2018"
+output: pdf_document
+author: Laurence Kell ^[Sea++], Toshi Kitikado ^[Tokyo University], Rishi Sharma ^[NOAA]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\begin{center}
+SUMMARY
+\end{center}
+
+\begin{center}
+KEYWORDS
+\end{center}
+\begin{center}
+Bluefin Tuna
+\end{center}
+
+# Introduction
+
+
+# Material and Methods
+
+
+### Scenarios
+
+
+## Methods
+
+
+# Results
+
+# References
+
+H.H. Lee, K.R. Piner, R.D. Methot, M.N. MaunderUse of likelihood profiling over a global scaling parameter to structure the population dynamics model: an example using blue marlin in the Pacific Ocean Fish. Res., 158 (2014), pp. 138-146
+
+Kristensen, K., Nielsen, A., Berg, C.W. , Skaug, H., Bell, B.M., 2016. TMB: Automatic Differentiation and Laplace Approximation. Journal of Statistical Software, doi: 10.18637/jss.v070.i05 
+
+Nielsen, A., Berg, C.W., 2014.  Estimation of time-varying selectivity in stock assessment using state-space models. Fisheries Research. http://dx.doi.org/10.1016/j.fishres.2014.01.014
+
+
+\newpage
+
+# Appendix
