@@ -9,7 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 \begin{center}
-SUMMARY testing
+SUMMARY
 \end{center}
 
 \begin{center}
