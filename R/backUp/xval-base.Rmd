@@ -1,0 +1,851 @@
+---
+title: "Jackknife"
+author: "L Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: word_document
+---
+
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(knitr)
+
+opts_chunk$set(cache     =TRUE, 
+               comment   =NA, 
+               warning   =FALSE, 
+               message   =FALSE, 
+               error     =FALSE, 
+               echo      =FALSE, 
+               eval      =TRUE,
+               fig.width =10, 
+               fig.height=8,
+               fig.path  ="../tex/jk-")
+
+iFig=0
+iTab=0
+```
+
+```{r init}
+library(plyr)
+library(dplyr)
+library(stringr)
+library(reshape2)
+library(ggplot2)
+library(ggplotFL)
+library(FLCore)
+library(FLBRP)
+library(FLife)
+library(scales)
+library(popbio)
+library(diags)
+library(stringr)
+
+dirMy="/home/laurence/Desktop/sea++/xval"
+dirDat=file.path(dirMy,"data")
+dirVpa=file.path(dirMy,"inputs/vpa")
+dirTex=file.path(dirMy,"tex")
+
+m=c(0.3800,0.3000,0.2400,0.2000,0.1800,0.1600,0.1400,0.1300,0.1200,0.1000)
+
+new=readVPA2Box(file.path(dirVpa,"new/bfte2017.c1"),m=m)
+```
+
+```{r jack,eval=FALSE}
+source('~/Desktop/flr/mpb/R/jackknife-vpa2box.R')
+
+jk=mlply(file.path(dirVpa,"new/bfte2017.c1"),jackknife.vpa2box,m=m)
+
+save(jk,file=file.path(dirDat,"jk.RData"),compress="xz")
+```
+
+
+
+```{r refs}
+source('~/Desktop/flr/FLife/R/refs.R')
+source('~/Desktop/flr/FLife/R/lhPar.R')
+
+dgs=mdply(data.frame(scen=file.path(dirVpa,"new/MINUS0.R"),
+                     stringsAsFactors=FALSE),
+                     function(scen) diags.vpa2box(scen))
+dgs=transform(dgs,Scenario=factor(scen,labels=c("Inflated")))
+load(file.path(dirDat,"jk.RData"))
+
+rfDat=ldply(jk, function(x) model.frame(refs(x[[1]][[2]], s=0.9)))
+rfDat=cbind(dgs,rfDat[-1,])
+save(rfDat,file=file.path(dirDat,"rfDat.RData"),compress="xz")
+```
+
+
+```{r ref2}
+library(FLife)
+
+source('~/Desktop/flr/FLife/R/refs.R')
+mf2FLPar=FLife:::mf2FLPar
+
+load(file.path(dirDat,"jk.RData"))
+
+rfDatHat=ldply(jk, function(x) model.frame(refs(x[[1]][[1]], s=0.9)))
+```
+
+
+```{r ref3, eval=FALSE}
+source('~/Desktop/flr/FLife/R/refs.R')
+source('~/Desktop/flr/FLife/R/lhPar.R')
+source('~/Desktop/flr/mpb/R/biodyn-jackSummary.R')
+
+setMethod("jackSummary", signature(object="FLPar",sim="FLPar"),
+          function(object,sim,...) {
+            
+            nms <-names(dimnames(object))
+            idx <-seq(length(nms))[nms != 'iter']
+            n   <-dims(sim)$iter 
+            
+            mn  <-object
+            u   <-sim
+            mnU <-apply(u, idx, mean)   
+            
+            SS <-apply(sweep(u, idx, mnU,"-")^2, idx, sum)
+            
+            bias <- (n-1)*(mn-mnU)
+            se   <- sqrt(((n-1)/n)*SS)
+            
+            cov  <-FLPar(cov(model.frame(u)[,dimnames(u)[[1]]])*(n-1)*(n-1)/n)
+            cor  =FLPar(cor(cov[drop=T]))
+            
+            return(FLPars("hat"=mn, "mean"=mnU, "se"=se, "cv"=se%/%mnU,
+                          "bias"=bias, "biasRel"=bias%/%mnU,
+                          "cov"=cov))})
+
+load(file.path(dirDat,"jk.RData"))
+
+rfs=llply(jk, function(x){
+  
+       res=FLPars(llply(x, refs, s=0.9))
+
+       rf1=as(transmute(model.frame(res[[1]]),
+                             ssmsy=s.current/s.f0.1_,
+                             ffmsy=f.current/f.f0.1_,
+                             r    =r,
+                             rt   =rt),"FLPar")
+       rf2=as(transmute(model.frame(res[[2]]),
+                             ssmsy=s.current/s.f0.1_,
+                             ffmsy=f.current/f.f0.1_,
+                             r    =r,
+                             rt   =rt),"FLPar")
+       
+       attributes(rf1)$iter.key=attributes(x[[1]])$iter.key
+       jackSummary(rf1,rf2)})
+       
+save(rfs, file=file.path(dirDat,"rfs.RData"),compress="xz")
+```
+
+
+```{r dat,fig.height=8,fig.width=6}
+library(gam)
+nms=unique(dgs$name)[c(1:4,6,5,7)]
+
+save(dgs, file=file.path(dirDat,"dgs.RData"),compress="xz")
+
+scale<-function(x,y,...){
+  args=list(...)
+  
+  if (length(args)==0) group=rep(1,length(x)) else group=args[[1]]  
+  
+  gm=gam(y~lo(x)+group,data=data.frame(x=x,y=y,group=group))
+
+  res=data.frame(hat =predict(gm),
+                 y     =gm$y,
+                 x     =x,
+                 group =group,
+                 scl   =c(0,coefficients(gm)[-(1:2)])[as.numeric(as.factor(group))]
+                 )
+  res$y  =res$y  -res$scl
+  res$hat=res$hat-res$scl
+  
+  if (length(args)==1) names(res)[4]=names(args)[1]  
+  
+  res[,-5]}
+
+dat=with(subset(dgs,scen==dgs$scen[1]),scale(year,x,name=as.character(name)))
+
+
+ggplot(dat)+
+  geom_line( aes(x,hat),data=dat[,c("x","hat")],col="grey60")+
+  geom_line( aes(x,hat))+
+  geom_line( aes(x,y))+
+  geom_point(aes(x,y,fill=name),shape=21)+
+  scale_fill_brewer(palette = "Set1")+
+  scale_y_continuous(breaks=c(-2,0,2))+
+  facet_grid(name~.)+
+  theme_bw(14)+xlab("Year")+ylab("CPUE")+
+  theme(legend.position="none")
+```
+**Figure `r iFig=iFig+1; iFig`.** Time series of CPUE indices, continuous black line is a loess smother showing the average trend by area (i.e. fitted to year for each area with series as a factor)
+
+
+```{r,fig.width=7,fig.height=7}
+source('~/Desktop/flr/FLife/R/lhPar.R')
+
+ggplot(aes(x,y,fill=Scenario,col=Scenario),data=dgs) +   
+      geom_point(shape=21,size=2)+
+      geom_smooth(se=FALSE,method="lm")+
+      geom_abline(aes(slope=1,intercept=0))+
+      xlab("Assessment Estimate")+ylab("Observered CPUE")+
+      facet_wrap(~name,scale="free")+
+      scale_fill_brewer(palette = "Set1")+
+      scale_colour_brewer(palette = "Set1")+
+      theme_bw()+
+      theme(legend.position="bottom")
+```
+**Figure `r iFig=iFig+1;iFig`.** Observed CPUE verses fitted, blue line is a linear regression fitted to points, black the y=x line. 
+
+```{r,fig.width=7,fig.height=9}
+dat=ddply(dgs, .(name), transform, residual=diags:::stdz(residual,na.rm=T))
+
+ggplot(aes(year,residual,col=Scenario,fill=Scenario),data=dat) +
+  geom_hline(aes(yintercept=0))      +
+  geom_point(shape=21,size=2)                       +
+  #geom_linerange(aes(year,ymin=0,ymax=residual),position="jitter")                       +
+  stat_smooth(method="loess",se=FALSE,fill="blue", alpha=0.1)  +
+  facet_wrap(~name,scale="free",ncol=2)+
+  scale_fill_brewer(  palette="Set1")+
+  scale_colour_brewer(palette="Set1")+
+  theme_bw()+ylab("Residual")+xlab("Year")+
+  theme(legend.position="bottom")
+```
+**Figure `r iFig=iFig+1;iFig`.** Plot of residuals by year, lines are loess smoothers.
+
+```{r,fig.width=7,fig.height=7}
+ggplot(dgs)                                              +
+  geom_point( aes(residual,residualLag,col=Scenario,fill=Scenario),shape=21)                  +
+  stat_smooth(aes(residual,residualLag,col=Scenario,fill=Scenario)
+              ,method="lm",se=FALSE,fill="blue", alpha=0.1)      +
+  geom_hline(aes(yintercept=0))                           +
+  facet_wrap(~name,scale="free",ncol=3)                   +
+  xlab(expression(Residual[t])) + 
+  ylab(expression(Residual[t+1]))+
+  scale_fill_brewer(  palette="Set1")+
+  scale_colour_brewer(palette="Set1")+
+  theme_bw()+
+  theme(legend.position="bottom")
+```
+**Figure `r iFig=iFig+1;iFig`.** Plot of autocorrelation, i.e. $residual_{t+1}$ verses $residual_{t}$, line is a linear regression through points.
+
+```{r,fig.width=6,fig.height=6}
+ggplot(dgs)                                           +
+  geom_point( aes(qqx,qqy,  col=Scenario,fill=Scenario),size=2,shape=21)                            +
+  stat_smooth(aes(qqx,qqHat,col=Scenario,fill=Scenario),
+              method="lm",se=FALSE,fill="blue", alpha=0.1)         +
+  facet_wrap(~name)+
+  scale_fill_brewer(  palette="Set1")+
+  scale_colour_brewer(palette="Set1")+
+  theme_bw()+
+  theme(legend.position="bottom")          
+```
+
+**Figure `r iFig=iFig+1;iFig`.** Quantile-quantile plot to compare residual distribution with the normal distribution, line is a linear regression.
+
+
+```{r,fig.width=6,fig.height=8}
+ggplot(aes(yhat, residual,col=Scenario,fill=Scenario),data=dgs)   +
+  geom_hline(aes(yintercept=0))         +
+  geom_point(shape=21)                          +
+  stat_smooth(method="loess",se=FALSE,span=.9,fill="blue", alpha=0.1)   +
+  facet_wrap(~name,scale="free",ncol=2)+
+  scale_fill_brewer(  palette="Set1")+
+  scale_fill_brewer(palette="Set1")+
+  scale_colour_brewer(palette="Set1")+
+  theme_bw()+
+  theme(legend.position="bottom") 
+```
+
+**Figure `r iFig=iFig+1;iFig`.** Plot of residuals against fitted value, to check variance relationship, lines are loess smoothers.
+
+```{r lm1,fig.height=5,fig.height=8}
+library(GGally)
+
+dat=ddply(transform(dgs,Scenario=factor(scen,labels=c("Inflated"))),
+          .(Scenario,name), function(x)
+            data.frame(year=x$year,x=x$x,cooksd=cooks.distance(lm(x$y~x$x-1))))
+
+ggplot(dat)+
+  geom_point(aes(x,cooksd,fill=name),shape=21,size=4)+
+  scale_colour_brewer(palette = "Set1")+
+  facet_grid(name~Scenario,scale="free",space="free")+
+  theme_bw(16)+xlab("CPUE")+ylab("Cooks Distance")+
+  theme(legend.position="none")
+```
+**Figure `r iFig=iFig+1;iFig`** Summary plots of Cooks Distance for the CPUE series fitted to the two VPA Scenarios.
+
+```{r lm3,fig.height=5,fig.height=10}
+ggplot(dat)+
+  geom_point(aes(year,cooksd,fill=name),shape=21,size=4)+
+  scale_colour_brewer(palette = "Set1")+
+  facet_grid(name~Scenario,scale="free",space="free")+
+  theme_bw(16)+xlab("Year")+ylab("Cooks Distance")+
+  theme(legend.position="bottom")
+```
+**Figure `r iFig=iFig+1;iFig`** Summary plots of Cooks Distance for the CPUE series by year fitted to the two VPA Scenarios.
+
+```{r lm,fig.height=8,fig.height=9}
+dat=transform(dgs,Scenario=factor(scen,labels=c("Inflated")))
+#mdl=lm(log(y)~name*Scenario*x,data=dat)
+mdl=lm(log(y)~name*x,data=dat)
+p=ggnostic(mdl,mapping=ggplot2::aes(color=name))+
+#  scale_colour_brewer(palette = "Set1")+
+  theme_bw()+
+  theme(legend.position="bottom")
+```
+<!-- **Figure iFig=iFig+1;iFig.** Summary plots of residuals, sigma, CVs and Cooks Distance for the CPUE series fitted to the two VPA Scenarios. -->
+
+```{r lm2,fig.height=8,fig.width=8}
+ggplot(ggnostic(mdl)$data)+
+  geom_point(aes(.hat,.resid,size=.cooksd))+ #,col=Scenario))+
+  scale_colour_brewer(palette = "Set1")+
+  facet_wrap(~name)+
+  theme_bw()+
+  theme(legend.position="bottom")+
+  xlab("Hat Values")+ylab("Studentized Residual")
+```
+**Figure `r iFig=iFig+1;iFig`.** Influence plots plotting residuals against hat values (i.e. leverage), size of bubble show the Cooks distance (i.e. the leverage).
+
+```{r stats}
+load(file.path(dirDat,"dgs.RData"))
+load(file.path(dirDat,"rfs.RData"))
+load(file.path(dirDat,"jk.RData"))
+load(file.path(dirDat,"rfDat.RData"))
+```
+
+```{r influence_s, fig.height=8, fig.width=8}
+dat=transform(rfDat,
+              fmsy=f.current/f.f0.1,
+              Scenario=factor(scen,labels=c("Inflated")))[,
+                                    c("Scenario","name","year","fmsy")]
+hat=transform(rfDatHat,
+              hat=f.current/f.f0.1,
+              Scenario=factor(X1,labels=c("Inflated")))[,
+                                    c("Scenario","hat")]
+dat=transform(merge(dat,hat),fmsy=fmsy/hat)              
+
+ggplot(dat)+
+  geom_hline(aes(yintercept=1))+
+  geom_point(aes(year,fmsy,fill=Scenario),shape=21,size=3)+
+  scale_fill_brewer(palette = "Set1")+
+  facet_grid(name~.)+
+  theme(legend.position="bottom")+
+  theme_bw()+xlab("Year")+ylab(expression(F/F[MSY]))
+```
+**Figure `r iFig=iFig+1;iFig`.** Jackknife estimates of DFBETA for $F/F_{MSY}$ by year and CPUE series.
+
+```{r influence_f, fig.height=8, fig.width=8}
+dat=transform(rfDat,
+              smsy=s.current/s.f0.1,
+              Scenario=factor(scen,labels=c("Inflated")))[,
+                                    c("Scenario","name","year","smsy")]
+hat=transform(rfDatHat,
+              hat=s.current/s.f0.1,
+              Scenario=factor(X1,labels=c("Inflated")))[,
+                                    c("Scenario","hat")]
+dat=transform(merge(dat,hat),smsy=smsy/hat)              
+ggplot(dat)+
+  geom_hline(aes(yintercept=1))+
+  geom_point(aes(year,smsy,fill=Scenario),shape=21,size=3)+
+  scale_fill_brewer(palette = "Set1")+
+  facet_grid(name~.)+
+  theme_bw()+xlab("Year")+ylab(expression(SSB/SSB[MSY]))
+```
+**Figure `r iFig=iFig+1;iFig`.** Jackknife estimates of DFBETA for $B/B_{MSY}$ by year and CPUE series.
+
+```{r influence_r, fig.height=8, fig.width=8}
+dat=transform(rfDat,
+              Scenario=factor(scen,labels=c("Inflated")))[,
+                                    c("Scenario","name","year","r","rt")]
+hat=transform(rfDatHat,
+              rHat   =r,
+              rtHat  =rt,
+              Scenario=factor(X1,labels=c("Inflated")))[,
+                                    c("Scenario","rHat","rtHat")]
+
+dat=transform(merge(dat,hat),r=r/rHat,rt=rt/rtHat)              
+ggplot(dat)+
+  geom_hline(aes(yintercept=1))+
+  geom_point(aes(year,r,fill=Scenario),shape=21,size=3)+
+  scale_fill_brewer(palette = "Set1")+
+  facet_grid(name~.)+
+  theme_bw()+xlab("Year")+ylab("r")+
+  theme(legend.position="bottom")
+```
+**Figure `r iFig=iFig+1;iFig`.**  Jackknife estimates of DFBETA for population growth rate $r$ by year and CPUE series.
+
+```{r influence_rt, fig.height=8, fig.width=8}
+ggplot(dat)+
+  geom_hline(aes(yintercept=1))+
+  geom_point(aes(year,rt,fill=Scenario),shape=21,size=3)+
+  scale_fill_brewer(palette = "Set1")+
+  facet_grid(name~.)+
+  theme_bw()+xlab("Year")+ylab(expression(r[recovery]))+
+  theme(legend.position="bottom")
+```
+**Figure `r iFig=iFig+1;iFig`.**  Jackknife estimates of DFBETA for time taken to recover to $B_{MSY}$ (negative values indicate stock is above $B_{MSY}$) by year and CPUE series.
+
+
+```{r, eval=FALSE}
+load(file.path(dirDat,"rfs.RData"))
+names(rfs[[1]])=c("hat","mean","se","cv","bias","biasRel","cov","cor")
+names(rfs[[2]])=c("hat","mean","se","cv","bias","biasRel","cov","cor")
+```
+
+```{r, fig.height=7,fig.width=9}
+load(file=file.path(dirDat,"rfDat.RData")
+
+dat=transmute(rfDat,
+              name =name,
+              ssmsy=s.current/s.f0.1,
+              ffmsy=f.current/f.f0.1,
+              r    =r,
+              rt   =rt,
+              residual=residual,
+              year    =year,
+              Scenario=factor(scen,labels=c("Inflated")))
+
+ggplot(melt(dat,id=c("name","residual","year","Scenario")))+
+  geom_point(aes(residual,value,fill=Scenario),shape=21,size=3)+
+  facet_grid(variable~name,scale="free")+
+  scale_fill_brewer(palette = "Set1")+
+  theme_bw()+
+  theme(legend.position="bottom")+
+  ylab("Jackknife Estimate")+xlab("Residuals")
+
+save(dat,file=file.path(dirDat,"dat.RData"))
+```
+**Figure `r iFig=iFig+1;iFig`.** Comparison of jackknifed estimates with residuals.
+
+
+```{r, cor_ssbmsy, fig.height=9, fig.width=9, eval=FALSE}
+library(reshape2)
+
+ggplot(dcast(dat,year+name~Scenario,value.var="ssmsy",mean))+
+   geom_point(aes(Reported,Inflated,fill=name),shape=21,size=4)+
+   geom_smooth(aes(Reported,Inflated),se=FALSE,method=lm)+
+   scale_fill_brewer(palette = "Set1")+
+   facet_wrap(~name,scale="free")+
+   theme_bw()+theme(legend.position="none")
+
+#**Figure `r iFig=iFig+1;iFig`.** Comparison of jackknife estimates of population growth rate $B/B_{MSY}$ by year and CPUE series.
+```
+
+
+```{r, cor_ffmsy, fig.height=9, fig.width=9, eval=FALSE}
+dat2=dcast(dat,year+name~Scenario,value.var="ffmsy",mean)
+
+ggplot(dcast(dat,year+name~Scenario,value.var="ffmsy",mean))+
+   geom_point(aes(Reported,Inflated,fill=name),shape=21,size=4)+
+   geom_smooth(aes(Reported,Inflated),se=FALSE,method=lm)+
+   scale_fill_brewer(palette = "Set1")+
+   facet_wrap(~name,scale="free")+
+   theme_bw()+theme(legend.position="none")
+
+#**Figure `r iFig=iFig+1;iFig`.** Comparison of jackknife estimates of population growth rate $F/F_{MSY}$ by CPUE series.
+```
+
+```{r, cor_r, fig.height=9, fig.width=9,eval=FALSE}
+library(reshape2)
+
+ggplot(dcast(dat,year+name~Scenario,value.var="ssmsy",mean))+
+   geom_point(aes(Reported,Inflated,fill=name),shape=21,size=4)+
+   geom_smooth(aes(Reported,Inflated),se=FALSE,method=lm)+
+   scale_fill_brewer(palette = "Set1")+
+   facet_wrap(~name,scale="free")+
+   theme_bw()+theme(legend.position="none")
+
+#**Figure `r iFig=iFig+1;iFig`.** Comparison of jackknife estimates of population growth rate $r$ by CPUE series.
+```
+
+```{r, cor_rt, fig.height=9, fig.width=9,eval=FALSE}
+library(reshape2)
+
+ggplot(dcast(dat,year+name~Scenario,value.var="ssmsy",mean))+
+   geom_point(aes(Reported,Inflated,fill=name),shape=21,size=4)+
+   geom_smooth(aes(Reported,Inflated),se=FALSE,method=lm)+
+   scale_fill_brewer(palette = "Set1")+
+   facet_wrap(~name,scale="free")+
+   theme_bw()+theme(legend.position="none")
+
+#**Figure `r iFig=iFig+1;iFig`.** Comparison of jackknife estimates of time taken to recover to $B/B_{MSY}$ (negative values indicate stock is above $B_{MSY}$) by CPUE series.
+```
+
+```{r, corr_ssbmsy, fig.height=9, fig.width=9,eval=FALSE}
+library(reshape2)
+
+ggplot(dcast(dat,year+name~Scenario,value.var="ssmsy",mean))+
+   geom_point(aes(rank(Reported),rank(Inflated),fill=name),shape=21,size=4)+
+   geom_smooth(aes(rank(Reported),rank(Inflated)),se=FALSE,method=lm)+
+   scale_fill_brewer(palette = "Set1")+
+   facet_wrap(~name,scale="free")+
+   theme_bw()+theme(legend.position="none")
+
+#**Figure `r iFig=iFig+1;iFig`.** Comparison of jackknife estimate ranks of population growth rate $B/B_{MSY}$ by year and CPUE series.
+```
+
+```{r, corr_ffmsy, fig.height=9, fig.width=9, eval=FALSE}
+ggplot(dcast(dat,year+name~Scenario,value.var="ffmsy",mean))+
+   geom_point(aes(rank(Reported),rank(Inflated),fill=name),shape=21,size=4)+
+   geom_smooth(aes(rank(Reported),rank(Inflated)),se=FALSE,method=lm)+
+   scale_fill_brewer(palette = "Set1")+
+   facet_wrap(~name,scale="free")+
+   theme_bw()+theme(legend.position="none")
+
+#**Figure `r iFig=iFig+1;iFig`.** Comparison of jackknife estimate ranks of population growth rate $F/F_{MSY}$ by CPUE series.
+```
+
+```{r, corr_r, fig.height=9, fig.width=9,eval=FALSE}
+ggplot(dcast(dat,year+name~Scenario,value.var="ssmsy",mean))+
+   geom_point(aes(rank(Reported),rank(Inflated),fill=name),shape=21,size=4)+
+   geom_smooth(aes(rank(Reported),rank(Inflated)),se=FALSE,method=lm)+
+   scale_fill_brewer(palette = "Set1")+
+   facet_wrap(~name,scale="free")+
+   theme_bw()+theme(legend.position="none")
+
+#**Figure `r iFig=iFig+1;iFig`.** Comparison of jackknife estimate ranks of population growth rate $r$ by CPUE series.
+```
+
+```{r, corr_rt, fig.height=9, fig.width=9,eval=FALSE}
+ggplot(dcast(dat,year+name~Scenario,value.var="ssmsy",mean))+
+   geom_point(aes(rank(Reported),rank(Inflated),fill=name),shape=21,size=4)+
+   geom_smooth(aes(rank(Reported),rank(Inflated)),se=FALSE,method=lm)+
+   scale_fill_brewer(palette = "Set1")+
+   facet_wrap(~name,scale="free")+
+   theme_bw()+theme(legend.position="none")
+
+#**Figure `r iFig=iFig+1;iFig`.** Comparison of jackknife estimate ranks of time taken to recover to $B/B_{MSY}$ (negative values indicate stock is above $B_{MSY}$) by CPUE series.
+```
+
+```{r}
+delta<-function(z,t){
+  if (t<0)
+    (1-exp(-z))/z
+  else
+    exp(-z*t/12)}
+
+butterVul<-function(paa,stk,waa){
+    
+  ag=dimnames(paa)$age
+  yr=dimnames(paa)$year 
+  
+  sp=paa[ag,yr]
+  hv=harvest(stk)[ag,yr]
+  cn=catch.n(stk)[ag,yr]
+  
+  #numerator
+  nm =apply(sp%*%hv%/%cn,c(1,6),sum)
+
+  #denominator
+  dn=hv%/%apply(hv,2:6,max)
+  dn=apply(dn==1,1:6,as.numeric)
+  dn[dn!=1]=NA
+  dn=dn%*%hv%*%sp%/%cn
+  dn=apply(dn,c(2:6),mean,na.rm=TRUE)
+  dn=apply(dn,c(3:6),sum,na.rm=TRUE)
+  
+  res=nm%/%dn
+  res%/%apply(res,2,max)}
+```
+
+```{r}
+source('~/Desktop/flr/diags/R/read-VPA2Box-FLIndices.R')
+dirJK ="/home/laurie/Desktop/SCRS/workshops/vpa/sessions/data"
+load(file.path(dirJK,"jk.RData"))
+stks=jk[[1]][[1]]
+qs  =jk[[1]][[2]]
+names(qs)=c("iter","name","q")
+
+idx=readVP2BoxIndices("/home/laurie/Desktop/kobe/inputs/bfte/2014/vpa/reported/med/bfte2014.d1")
+names(idx)=c('ESPMarTrap','JLL EastMed','Nor PS','JP LL NEA','SP BB1','SP BB2','SP BB3')
+sel.pattern(idx[[3]])[]=1
+  
+dgs=diagsVpa2box("/home/laurie/Desktop/kobe/inputs/bfte/2014/vpa/reported/med/MINUS0.R")
+
+sim=data.frame(iter=seq(dim(dgs)[1]),dgs[,1:2])
+qs =merge(sim,qs,by=c("name","iter"))
+qs =qs[do.call(order,list(qs[,"year"])),]
+qs =qs[do.call(order,list(qs[,c("name")])),]
+```
+
+```{r}
+chk=ddply(dgs,.(name), with, {
+
+  stk=stks[[1]]
+  paa=catch.n( idx[[name[1]]])[,dimnames(index(idx[[name[1]]]))$year]
+  waa=catch.wt(idx[[name[1]]])[,dimnames(index(idx[[name[1]]]))$year]
+
+  if (index(idx[[name[1]]])@units=="number") waa[]=1
+
+  if (type(idx[[name[1]]])=="butt") 
+     vl =butterVul(paa,stk)
+  else if (type(idx[[name[1]]])=="fixed")
+     vl=sel.pattern(idx[[name[1]]])
+  
+  aa=stock.n(stk)[dimnames(vl)$age,dimnames(index(idx[[name[1]]]))$year]%*%waa[dimnames(vl)$age,]
+
+  hat=apply(vl%*%aa%*%
+           delta(harvest(stk)[dimnames(vl)$age,dimnames(index(idx[[name[1]]]))$year]+
+                       m(stk)[dimnames(vl)$age,dimnames(index(idx[[name[1]]]))$year],-1),2,sum)*q
+
+  data.frame(hat=hat,year=dimnames(index(idx[[name[1]]]))$year)})
+
+rsdl=merge(chk,dgs[,c("name","year","y2","x2")],by=c("name","year"))
+         
+p1=ggplot(rsdl)+
+  geom_point(aes(hat,y2,fill=name),shape=21)+
+  facet_wrap(~name,scale="free")
+  
+p2=ggplot(subset(rsdl,name=="JLL EastMed"))+
+  geom_point(aes(hat,x2),col="red")+
+  geom_point(aes(y2, x2),col="blue")
+```
+
+```{r}
+res=ddply(qs,.(name,iter,year), with, {
+  paa=catch.n( idx[[name]])[,dimnames(index(idx[[name]]))$year]
+  waa=catch.wt(idx[[name]])[,dimnames(index(idx[[name]]))$year]
+  
+  if (index(idx[[name[1]]])@units=="number") waa[]=1
+
+  stk=iter(stks[[2]],iter)
+  if (type(idx[[name[1]]])=="butt") 
+     vl =butterVul(paa,stk)
+  else if (type(idx[[name[1]]])=="fixed")
+     vl=sel.pattern(idx[[name[1]]])
+
+  aa=stock.n(stk)[dimnames(vl)$age,dimnames(index(idx[[name]]))$year]%*%waa[dimnames(vl)$age,]
+  
+  hat=apply(vl%*%aa%*%
+           delta(harvest(stk)[dimnames(vl)$age,dimnames(index(idx[[name]]))$year]+
+                       m(stk)[dimnames(vl)$age,dimnames(index(idx[[name]]))$year],-1),2,sum)*q
+  
+  data.frame(hat=hat[ac(year)],q=q)})
+
+rsdl=merge(res,dgs[,c("name","year","y2","x2")],by=c("name","year"))
+         
+p1=ggplot(rsdl)+
+  geom_point(aes(hat,y2,fill=name),shape=21)+
+  facet_wrap(~name,scale="free")
+
+p2=ggplot(rsdl)+
+  geom_point(aes(year,log(x2/hat)),col="red")+
+  geom_point(aes(year,log(x2/y2)),col="blue")+
+  facet_wrap(~name,scale="free")
+```
+
+```{r}
+library(reshape2)
+ggplot(melt(rsdl[,c("name","x2","y2","hat")],id=c("name","x2")))+
+  geom_boxplot(aes(name, log(x2/value), fill=variable),outlier.size=2.5)+
+  scale_fill_manual("Residuals",
+                      labels = c("Model", "Prediction"),
+                      values = c("#E69F00", "#D55E00"))+
+  theme_bw()+xlab("Fleet")+ylab("Residual")+
+  theme(legend.position="bottom")
+```
+**Figure `r iFig=iFig+1;iFig`.** Prediction residuals by CPUE series for the reported catch Scenario.
+
+```{r}
+ggplot(melt(subset(rsdl,as.numeric(ac(year))>2005)[,                                c("name","x2","y2","hat","year")],id=c("name","year","x2")),
+          aes(factor(year), log(x2/value),fill=variable)) +
+  geom_boxplot() +
+  geom_point(position=position_dodge(width=0.75),aes(group=variable,col=name),size=2.5)+
+  scale_colour_brewer(palette = "Set1")+
+  scale_fill_manual("Residuals",
+                      labels = c("Model", "Prediction"),
+                      values = c("#E69F00", "#D55E00"))+
+  theme_bw()+xlab("Year")+ylab("Residual")+
+  theme(legend.position="bottom")
+```
+**Figure `r iFig=iFig+1;iFig`.** Prediction residuals by year for the reported catch Scenario.
+
+```{r}
+source('~/Desktop/flr/diags/R/read-VPA2Box-FLIndices.R')
+dirJK ="/home/laurie/Desktop/SCRS/workshops/vpa/sessions/data"
+load(file.path(dirJK,"jk.RData"))
+stks=jk[[2]][[1]]
+qs  =jk[[2]][[2]]
+names(qs)=c("iter","name","q")
+
+idx=readVP2BoxIndices("/home/laurie/Desktop/kobe/inputs/bfte/2014/vpa/inflated/med/bfte2014.d1")
+names(idx)=c('ESPMarTrap','JLL EastMed','Nor PS','JP LL NEA','SP BB1','SP BB2','SP BB3')
+sel.pattern(idx[[3]])[]=1
+  
+dgs=diagsVpa2box("/home/laurie/Desktop/kobe/inputs/bfte/2014/vpa/inflated/med/MINUS0.R")
+
+sim=data.frame(iter=seq(dim(dgs)[1]),dgs[,1:2])
+qs =merge(sim,qs,by=c("name","iter"))
+qs =qs[do.call(order,list(qs[,"year"])),]
+qs =qs[do.call(order,list(qs[,c("name")])),]
+
+chk=ddply(dgs,.(name), with, {
+
+  paa=catch.n( idx[[name[1]]])[,dimnames(index(idx[[name[1]]]))$year]
+  waa=catch.wt(idx[[name[1]]])[,dimnames(index(idx[[name[1]]]))$year]
+
+  if (index(idx[[name[1]]])@units=="number") waa[]=1
+
+  stk=stks[[1]]
+  
+  if (type(idx[[name[1]]])=="butt") 
+     vl =butterVul(paa,stk)
+  else if (type(idx[[name[1]]])=="fixed")
+     vl=sel.pattern(idx[[name[1]]])
+  
+  aa=stock.n(stk)[dimnames(vl)$age,dimnames(index(idx[[name[1]]]))$year]%*%waa[dimnames(vl)$age,]
+
+  hat=apply(vl%*%aa%*%
+           delta(harvest(stk)[dimnames(vl)$age,dimnames(index(idx[[name[1]]]))$year]+
+                       m(stk)[dimnames(vl)$age,dimnames(index(idx[[name[1]]]))$year],-1),2,sum)*q
+
+  data.frame(hat=hat,year=dimnames(index(idx[[name[1]]]))$year)})
+
+rsdl=merge(chk,dgs[,c("name","year","y2","x2")],by=c("name","year"))
+         
+p1=ggplot(rsdl)+
+  geom_point(aes(hat,y2,fill=name),shape=21)+
+  facet_wrap(~name,scale="free")
+  
+p2=ggplot(subset(rsdl,name=="JLL EastMed"))+
+  geom_point(aes(hat,x2),col="red")+
+  geom_point(aes(y2, x2),col="blue")
+```
+
+```{r}
+res=ddply(qs,.(name,iter,year), with, {
+  paa=catch.n( idx[[name]])[,dimnames(index(idx[[name]]))$year]
+  waa=catch.wt(idx[[name]])[,dimnames(index(idx[[name]]))$year]
+  
+  if (index(idx[[name[1]]])@units=="number") waa[]=1
+
+  stk=iter(stks[[2]],iter)
+  if (type(idx[[name[1]]])=="butt") 
+     vl =butterVul(paa,stk)
+  else if (type(idx[[name[1]]])=="fixed")
+     vl=sel.pattern(idx[[name[1]]])
+
+  aa=stock.n(stk)[dimnames(vl)$age,dimnames(index(idx[[name]]))$year]%*%waa[dimnames(vl)$age,]
+  
+  hat=apply(vl%*%aa%*%
+           delta(harvest(stk)[dimnames(vl)$age,dimnames(index(idx[[name]]))$year]+
+                       m(stk)[dimnames(vl)$age,dimnames(index(idx[[name]]))$year],-1),2,sum)*q
+  
+  data.frame(hat=hat[ac(year)],q=q)})
+
+rsdl=merge(res,dgs[,c("name","year","y2","x2")],by=c("name","year"))
+         
+p1=ggplot(rsdl)+
+  geom_point(aes(hat,y2,fill=name),shape=21)+
+  facet_wrap(~name,scale="free")
+
+p2=ggplot(rsdl)+
+  geom_point(aes(year,log(x2/hat)),col="red")+
+  geom_point(aes(year,log(x2/y2)),col="blue")+
+  facet_wrap(~name,scale="free")
+```
+
+```{r}
+library(reshape2)
+ggplot(melt(rsdl[,c("name","x2","y2","hat")],id=c("name","x2")))+
+  geom_boxplot(aes(name, log(x2/value), fill=variable),outlier.size=2.5)+
+  scale_fill_manual("Residuals",
+                      labels = c("Model", "Prediction"),
+                      values = c("#E69F00", "#D55E00"))+
+  theme_bw()+xlab("Fleet")+ylab("Residual")+
+  theme(legend.position="bottom")
+```
+**Figure `r iFig=iFig+1;iFig`.** Prediction residuals by CPUE series for the inflated catch Scenario.
+
+```{r}
+ggplot(melt(subset(rsdl,year>=2005)[,c("name","x2","y2","hat","year")],id=c("name","year","x2")),
+          aes(factor(year), log(x2/value),fill=variable)) +
+  geom_boxplot() +
+  geom_point(position=position_dodge(width=0.75),aes(group=variable,col=name),size=2.5)+
+  scale_colour_brewer(palette = "Set1")+
+  scale_fill_manual("Residuals",
+                      labels = c("Model", "Prediction"),
+                      values = c("#E69F00", "#D55E00"))+
+  theme_bw()+xlab("Year")+ylab("Residual")+
+  theme(legend.position="bottom")
+```
+**Figure `r iFig=iFig+1;iFig`.** Prediction residuals by year for the inflated catch Scenario.
+
+
+\newpage
+#Tables
+
+```{r}
+library(pander)
+pander::panderOptions('table.split.table', 350)
+
+load(file=file.path(dirDat,"rfs.RData")
+```
+
+**Table `r iTab=iTab+1; iTab`** Summary of reported catch Scenario summary statistics. 
+```{r}
+pander::pandoc.table(model.frame(rfs[[1]][1:6])[,-2], style="rmarkdown")
+```
+
+```{r, eval=FALSE}
+pander::pandoc.table(rfs[[1]][[8]][drop=T], style="rmarkdown")
+```
+
+**Table `r iTab=iTab+1; iTab`** Summary of inflated catch Scenario summary statistics.
+```{r}
+pander::pandoc.table(model.frame(rfs[[2]][1:6])[,-2], style="rmarkdown")
+```
+
+```{r, eval=FALSE}
+pander::pandoc.table(rfs[[2]][[8]][drop=T], style="rmarkdown")
+```
+
+
+```{r, eval=FALSE}
+library(FLCore)
+library(ggplotFL)
+library(FLife)
+
+source('~/Desktop/flr/diags/R/read-VPA2Box-FLIndices.R')
+
+
+m=c(0.49,0.24,0.24,0.24,0.24,0.20,0.175,0.15,0.125,0.10) 
+
+u=readVP2BoxIndices("/home/laurie/Desktop/SCRS/bftAss/bft2017/inputs/2017/bfte2017.d1")
+names(u)=c("MarPorTrap","JLL EastMed","JP LL NEA1","JP LL NEA2","SP BB1","SP BB2","Aerial","larval survey")
+u=FLQuants(llply(u, index))
+
+vpa=readVPA2Box("/home/laurie/Desktop/SCRS/bftAss/bft2017/inputs/2017/bfte2017.c1")
+
+
+bd=biodyn(catch=catch(vpa))
+params(bd)["k"]=mean(catch(vpa))*12.5
+params(bd)["p"]=0.0000001
+bd=fwd(bd,catch=catch(vpa))
+
+setParams(bd)=u
+setControl(bd)=params(bd)
+
+control(bd)[paste("q",1:7,sep=""),c("min","max")]=
+             control(bd)[paste("q",1:7,sep=""),c("min","max")]*c(0.1,10)
+control(bd)[paste("sigma",1:7,sep=""),c("min","max")]=
+  control(bd)[paste("q",1:7,sep=""),c("min","max")]*c(0.1,10)
+control(bd)[paste("q",1:7,sep=""),"phase"]=2
+control(bd)[paste("q",1:7,sep=""),"phase"]=-2
+
+bd=fit(bd,u)
+
+ss1=sum(diags(bd)[,"residual"]^2,na.rm=TRUE)
+ss2=sum(diags(asp2013)[,"residual"]^2,na.rm=TRUE)
+
+plot(mpb:::biodyns(list("biodyn"=bd,"aspic"=as(asp2013,"biodyn"))))+
+  theme_bw()
+```
+**Figure `r iFig=iFig+1; iFig`.** 
+
+
+
+```

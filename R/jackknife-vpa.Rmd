@@ -1,0 +1,59 @@
+---
+title: "Jackknife"
+author: "L Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: word_document
+---
+
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(knitr)
+
+opts_chunk$set(cache     =TRUE, 
+               comment   =NA, 
+               warning   =FALSE, 
+               message   =FALSE, 
+               error     =FALSE, 
+               echo      =FALSE, 
+               eval      =TRUE,
+               fig.width =10, 
+               fig.height=8,
+               fig.path  ="../tex/jk-")
+
+iFig=0
+iTab=0
+```
+
+```{r init}
+library(plyr)
+library(dplyr)
+library(stringr)
+library(reshape2)
+library(ggplot2)
+library(ggplotFL)
+library(FLCore)
+library(FLBRP)
+library(FLife)
+library(scales)
+library(popbio)
+library(diags)
+library(stringr)
+
+dirMy="/home/laurence/Desktop/sea++/xval"
+dirDat=file.path(dirMy,"data")
+dirVpa=file.path(dirMy,"inputs/vpa")
+dirTex=file.path(dirMy,"tex")
+
+m=c(0.3800,0.3000,0.2400,0.2000,0.1800,0.1600,0.1400,0.1300,0.1200,0.1000)
+
+new=readVPA2Box(file.path(dirVpa,"new/bfte2017.c1"),m=m)
+```
+
+```{r jack,eval=FALSE}
+source('~/Desktop/flr/mpb/R/jackknife-vpa2box.R')
+
+jk=mlply(file.path(dirVpa,"new/bfte2017.c1"),jackknife.vpa2box,m=m)
+
+save(jk,file=file.path(dirDat,"jk.RData"),compress="xz")
+```
