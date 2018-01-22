@@ -51,7 +51,7 @@ new=readVPA2Box(file.path(dirVpa,"new/bfte2017.c1"),m=m)
 ```
 
 ```{r jack,eval=FALSE}
-source('~/Desktop/flr/mpb/R/jackknife-vpa2box.R')
+source(file.path(dirMy,'R/jackknife-vpa2box.R'))
 
 jk=mlply(file.path(dirVpa,"new/bfte2017.c1"),jackknife.vpa2box,m=m)
 
