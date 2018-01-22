@@ -28,15 +28,10 @@ iTab=0
 ```{r init}
 library(plyr)
 library(dplyr)
-library(stringr)
 library(reshape2)
 library(ggplot2)
 library(ggplotFL)
 library(FLCore)
-library(FLBRP)
-library(FLife)
-library(scales)
-library(popbio)
 library(diags)
 library(stringr)
 
