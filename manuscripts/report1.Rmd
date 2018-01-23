@@ -19,16 +19,53 @@ KEYWORDS
 Bluefin Tuna
 \end{center}
 
+Activities
+
+Task are to
+
+    Collate the datasets, summarise the observations, agree and run a base case and then summarise the model outputs.
+    Agree the cross-validation procedure
+    Develop model code
+    Make work available via the web to allow collaboration across the tRFMOs
+        Wiki to document the work; and
+        a code repository established using github.
+    Agree intersessional work plan for running analysis
+
+Outputs
+
+    Specification of scenarios
+    Code repository
+    Wiki documenting activities
+    Report for scientific committees of tRFMOs summarising the approach
+    Draft outline for peer review paper.
+
+Outcome
+
+An objective way to
+
+    choose scenarios for use in stock assessment and development of OMs;
+    and to reject and weight scenarios
+
+
+
 # Introduction
 
+The aim of this study is to develop an objective procedure based on cross-valiadtion  for comparing Opertaing Model and Stock Assessment scenarios, comprising alternative datasets and model structures.
+
+In fish stock assessment model validation is often based on a naïve adaptation of Pearson residuals, i.e. the difference between observations and posterior means, even if this approach is flawed (Thygesen, 2017). A reason for this is because statistics based on residuals from model fits are not always a good guide to how well that model will predict, since a high R<sup>2</sup> or low root mean square error (RMSE) can be obtained by over-fitting. For example, in a simple polynomial regression better fits to the data can be obtained by adding higher order terms but the predictions from the model on new data will usually get worse as higher order terms are added. This problem is compounded by often having to compare scenarios for alernative datasets and model structures with different data requirements, and so AIC cannot be used to compare models. In addition there are also a range of potential problems to identify when examining residuals, e.g. bias, drift, skewness, missing variables, and heteroscedasticity. When inspecting residual patterns, however, there is a danger of hypothesis fishing (Wasserstein and Lazar, 2016) and so it is good practice to reserve part of the data for validation. This ensures that the significance of a pattern in the data is not tested on the same data set which suggested the pattern.
+
+Cross validation evaluates the predictive error of a model by testing it on a set of data not used in fitting. There is often insufficient data, however, in stock assessment datasets to allow some of it to be kept back for testing. A more sophisticated way to create test datasets is, like the jackkife, to leave out one (or more) observation at a time. Cross validation then allows prediction residuals to be calculated, i.e. the difference between fitted and predicted values where the later is calculated from the out-of-sample predictions.
+
+Prediction residuals can either be for historical or future observations. In the later case for example a one-step forward prediction is where data points are made available to the model one measurement at a time, and the model is evaluated by its ability to predict the next data point. This is the general principle of frequentiststatistics (Dawid, 1984).
+
+In this study we show how prediction residuals can be used to validate stock assessment scenarios, using as an example East Atlantic and Mediterranean bluefin. Model validation examines if the model family should be modified or extended, and is complementary to model selection and hypothesis testing. Model selection searches for the most suitable model within a family, whilst hypothesis testing examines if the model structure can be reduced. 
 
 # Material and Methods
 
-
-### Scenarios
-
+The case study is based on the 2017 East Atlantic and Mediterranean bluefin tuna (ABFTE) stock assessment. A base case is first  set up for virtual population analysis (VPA) and Stock Synthese (SS) and then range of scenarios are implemented based on i) choice of data, ii) values of fixed parameters, and iii) model structure.
 
 ## Methods
+
 
 
 # Results
