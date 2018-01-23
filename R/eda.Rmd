@@ -1,0 +1,319 @@
+---
+title: "Exploratory Data Analysis" 
+subtitle: "Eastern Bluefin"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: word_document
+---
+
+```{r dir, echo=FALSE}
+dirMy="/home/laurence/Desktop/sea++/xval"
+dirDat=file.path(dirMy,"data")
+dirVpa=file.path(dirMy,"inputs/vpa")
+dirTex=file.path(dirMy,"tex")
+```
+
+```{r knitr, echo=FALSE}
+library(knitr)
+
+opts_chunk$set(comment=NA, 
+               fig.width =5.5, 
+               fig.height=6,
+               fig.path  ="../tex/vpaData-",
+               warning=FALSE, 
+               message=FALSE, 
+               error  =FALSE, 
+               echo   =FALSE, 
+               eval   =TRUE,
+               cache  =TRUE,
+               cache.path="cache/vpaData")
+iFig=0
+iTab=0
+```
+
+
+```{r init}
+library(ggplot2)
+library(reshape2)
+library(readxl)
+
+library(plyr)
+library(dplyr)
+
+library(gam)
+
+library(GGally)
+library(corrplot)
+
+#install.packages("FLCore", repos = "http://cloud.r-project.org/")
+
+library(FLCore)
+
+#source('~/Desktop/flr/diags/R/read-VPA2Box-FLIndices.R')
+
+theme_set(theme_bw(14))
+options(digits=3)
+
+u=diags:::readVP2BoxIndices(file.path(dirVpa,"new/bfte2017.d1"))
+names(u)=c("ESPMarTrap","MarPorTrap","JLL EastMed","JP LL NEA1","JP LL NEA2",
+           "SP BB1",    "SP BB2",    "Aerial",     "larval survey")
+
+rng=ldply(u,function(x) range(x))
+cv =ldply(u,function(x) as.data.frame(index.var(x),drop=TRUE))
+obs=ldply(u,function(x) as.data.frame(index(    x),drop=TRUE))
+obs=data.frame(obs[,1:2],obs=obs[,3],se=cv[,3])
+obs=transform(obs,p0.025=qlnorm(0.025,log(obs),se),
+                  p0.975=qlnorm(0.975,log(obs),se))
+
+names(rng)[1]="name"
+
+u=FLQuants(llply(u, index))
+```
+
+```{r raw}
+ggplot(obs)+
+  geom_line(aes(year,obs))+
+  geom_point(aes(year,obs),size=.25)+
+  geom_errorbar(aes(year,ymin=p0.025,ymax=p0.975),size=0.5)+
+  #geom_ribbon(aes(year,ymin=p0.025,ymax=p0.975),alpha=0.05,col="blue")+
+  facet_grid(.id~.,scale="free")+
+  theme_bw()
+```
+**Figure `r iFig=iFig+1; iFig`.** Time series of CPUE indices with 95% confidence intervals.
+
+
+```{r}
+scale<-function(x,y,...){
+  args=list(...)
+  
+  if (length(args)==0) group=rep(1,length(x)) else group=args[[1]]  
+  
+  gm=gam(y~lo(x)+group,data=data.frame(x=x,y=y,group=group))
+
+  res=data.frame(hat =predict(gm),
+                 y     =gm$y,
+                 x     =x,
+                 group =group,
+                 scl   =c(0,coefficients(gm)[-(1:2)])[as.numeric(as.factor(group))]
+                 )
+  res$y  =res$y  -res$scl
+  res$hat=res$hat-res$scl
+  
+  if (length(args)==1) names(res)[4]=names(args)[1]  
+  
+  res[,-5]}
+
+my_density <- function(data,mapping,...){
+  ggplot(data=data,mapping=mapping)+
+    geom_density(...,lwd=1)}
+
+my_bar <- function(data,mapping,...){
+  ggplot(data=data,mapping=mapping)+
+    geom_bar(...)}
+
+my_smooth <- function(data,mapping,...){
+  ggplot(data=data,mapping=mapping)+
+    geom_point(...,size=.5)+
+    geom_smooth(...,method="lm",se=FALSE)}
+
+my_ccf<-function(cpue,n=10){
+cc=mdply(expand.grid(a=names(cpue),b=names(cpue)),
+         function(a,b){
+           #print(paste(a,b))
+           res=model.frame(mcf(FLQuants(cpue[c(a,b)])))
+           res=subset(res,!is.na(res[,7])&!is.na(res[,8]))
+
+           if (dim(res)[1]>n){
+             res=data.frame(lag=-n:n,data=ccf(res[,7],res[,8],plot=F,
+                                                lag.max=n)$acf)
+             return(res)}else{return(NULL)}}
+           )}
+```
+
+```{r plot, fig.height=10,fig.width=8}
+library(diags)
+
+dat=subset(ldply(u,as.data.frame),!is.na(data)&!is.na(.id))
+dat=ddply(dat,.(.id), with, data.frame(year=year,y=diags:::stdz(data)))
+
+dat=with(dat,scale(x=year,y=y,name=.id))
+
+ggplot(dat)+
+  geom_line( aes(x,hat),data=dat[,c("x","y","hat")],col="grey60")+
+  geom_line( aes(x,hat))+
+  geom_line( aes(x,y))+
+  geom_point(aes(x,y))+
+  facet_grid(name~.,scale="free",space="free_x")+
+  theme_bw(14)+
+  theme(legend.position="bottom")
+```
+**Figure `r iFig=iFig+1; iFig`.** Time series of CPUE indices, continuous black line is a lowess smother showing the average trend by area (i.e. fitted to year for each area with series as a factor)
+
+```{r plot2, fig.height=10,fig.width=8}
+ggplot(transform(dat,residual=y-hat))+
+  geom_hline(aes(yintercept=0))+
+  geom_point(aes(x,residual),position=position_dodge(width = 1))+
+  geom_line(aes(x,residual),alpha=0.5)+
+  geom_linerange(aes(x,ymin=0,ymax=residual),position=position_dodge(width = 1))+
+  theme(legend.position="bottom")+
+  facet_grid(name~.,scale="free",space="free_x")+
+  theme_bw(14)+
+  theme(legend.position="none")
+```
+**Figure `r iFig=iFig+1; iFig`.** Time series of residuals from the lowess fit.
+
+
+```{r plot-pairs-n, fig.height=8,fig.width=8}
+dat=subset(ldply(u,as.data.frame),!is.na(data)&!is.na(.id))
+dat=ddply(dat,.(.id), with, data.frame(year=year,y=diags:::stdz(data)))
+
+mat=dcast(dat,year~.id,value="y")
+names(mat)=gsub(" ", "_",names(mat))
+
+ggpairs(mat[,-1],
+  upper=list(continuous=wrap("cor",size=4, hjust=0.5)),
+  lower=list(continuous = wrap(my_smooth)),
+  diag=list(continuous="bar"))
+```
+**Figure `r iFig=iFig+1; iFig`.** Pairwise scatter plots to look at correlations between Indices, North.
+
+```{r plot-cor-n, fig.height=8,fig.width=8}
+cr=cor(mat[,-1],use="pairwise.complete.obs")
+dimnames(cr)=list(gsub("_"," ",names(mat)[-1]),gsub("_"," ",names(mat)[-1]))
+cr[is.na(cr)]=0
+corrplot(cr,diag=F,order="hclust",addrect=3)  +          
+             theme(legend.position="bottom")  
+```
+**Figure `r iFig=iFig+1; iFig`.** Plot of the correlation matrix for the Southern CPUE indices, blue indicate a positive correlation  and red negative. the order of the indices and the rectanglur boxes are chosen based on a hierarchical cluster analysis using a set of dissimilarities for the indices being clustered.
+
+```{r ccf-n, fig.height=8,fig.width=8}
+is(u
+   )
+#cc=my_ccf(u,n=7)
+
+#ggplot(cc)+
+#  geom_linerange(aes(x=lag,ymin=0,ymax=data))+
+#  facet_grid(a~b)+
+#  geom_vline(aes(xintercept=0))+
+#  theme_bw(14)    
+```
+**Figure `r iFig=iFig+1; iFig`** Cross correlations between Northern indices, to identify potential lags due to year-class effects.
+
+
+```{r ccf-n3, fig.height=8,fig.width=8}
+waa=read.table(file.path(dirVpa,"new/bfte2017.d1"),skip=428,nrows=483-428)
+waa=waa[waa[,1]%in%c(6,7,9),]
+names(waa)[c(1:2)]=c("name","year")
+waa=melt(waa,id=c("name","year"))
+waa=transmute(waa,name=name,year=year,age=as.numeric(variable),wt=value)
+waa$name=rng[waa$name,1]
+
+paa=read.table(file.path(dirVpa,"new/bfte2017.d1"),skip=264,nrows=422-264)
+names(paa)[1:2]=c("name","year")
+paa=melt(paa,id=c("name","year"))
+paa=transmute(paa,name=name,year=year,age=as.numeric(variable),p=value)
+paa$name=rng[paa$name,1]
+
+paa=merge(paa,waa,by=c("name","year","age"),all.x=TRUE)
+paa=transform(paa,decade=10*(year%/%10))
+
+nms=unique(waa$name)
+
+raa=ddply(subset(paa,!(name%in%nms)),.(name,decade), transform, p=p/sum(p))
+baa=ddply(subset(paa, (name%in%nms)),.(name,decade), transform, p=wt*p/sum(wt*p))
+```
+
+```{r ccf-n4, fig.height=8,fig.width=8}
+nm.=c(nms,"Aerial")
+
+ggplot(raa)+
+  geom_histogram(aes(age,weight=p),bin=1)+
+  geom_vline(aes(xintercept=min-0.25),data=subset(rng,!(name%in%nm.))[-(8:9),],col="darkgreen")+
+  geom_vline(aes(xintercept=max+0.25),data=subset(rng,!(name%in%nm.))[-(8:9),],col="darkgreen")+
+  facet_grid(decade~name,scale="free_y",space="free")+
+  theme_bw()+xlab("Year")+
+  theme(legend.position="none")
+```
+**Figure `r iFig=iFig+1; iFig`** Catch compostion, vertical lines show the ages used in calibration.
+
+```{r ccf-n5, fig.height=8,fig.width=8}
+ggplot(baa)+
+  geom_histogram(aes(age,weight=p),bin=1)+
+  geom_vline(aes(xintercept=min-0.25),data=subset(rng,(name%in%nms))[-(8:9),],col="darkgreen")+
+  geom_vline(aes(xintercept=max+0.25),data=subset(rng,(name%in%nms))[-(8:9),],col="darkgreen")+
+  facet_grid(decade~name,scale="free_y",space="free")+
+  theme_bw()+xlab("Year")+
+  theme(legend.position="none")
+```
+**Figure `r iFig=iFig+1; iFig`** Catch biomass compostion, vertical lines show the ages used in calibration.
+
+```{r ccf-n2, fig.height=8,fig.width=8}
+paa=read.table(file.path(dirVpa,"new/bfte2017.d1"),skip=262,nrows=415-262)
+names(paa)[1:2]=c("name","year")
+paa=melt(paa,id=c("name","year"))
+paa=transform(paa,age=as.numeric(variable),n=value)
+
+paa$n[paa$n==0]=.1
+paa=subset(paa,name<8)
+paa$name=rng[paa$name,1]
+cca=ddply(paa,.(name,year), with, FLife:::cc(age,n))
+
+ggplot(cca)+
+  geom_line(aes(age,sel,group=year),col="grey")+
+  geom_point(aes(age,sel,col=factor(5*(year%/%5))),size=.25)+
+  geom_smooth(aes(age,sel),se=FALSE)+
+  geom_vline(aes(xintercept=min-0.25),data=rng[-(8:9),],col="darkgreen")+
+  geom_vline(aes(xintercept=max+0.25),data=rng[-(8:9),],col="darkgreen")+
+  facet_wrap(~name,ncol=2)+
+  theme_bw()+
+  theme(legend.position="none")
+```
+**Figure `r iFig=iFig+1; iFig`** Catch curve analyses, vertical lines show the ages used in calibration.
+
+```{r cca}
+caa=read.table(file.path(dirVpa,"new/bfte2017.d1"),skip=24,nrows=71-24)
+names(caa)[1]="year"
+caa=transform(melt(caa,id="year"),age=as.numeric(variable))
+caa=transform(ddply(subset(caa,age<10&value!=0),.(year), with, FLife:::cc(age,value)),decade=10*(year%/%10))
+
+ggplot(caa)+
+  geom_line(aes(age,sel,group=year),col="grey")+
+  geom_point(aes(age,sel,col=factor(5*(year%/%5))),size=.25)+
+  geom_smooth(aes(age,sel),se=FALSE)+
+  facet_wrap(~decade,ncol=2)+
+  theme_bw()+
+  theme(legend.position="none")
+```
+**Figure `r iFig=iFig+1; iFig`** Selection pattern of the entire catch-at-age.
+
+```{r sel, fig.height=4, eval=FALSE}
+dat=cbind(subset(caa,age==9)[,c("year","sel")],pg=ddply(subset(caa,age>9),.(year),with,mean(sel))[,"V1"])
+dat=transform(dat,fratio=pg/sel)
+
+ggplot(melt(dat[,-4],id="year"),aes(year,value,col=variable))+
+  geom_point()+
+  geom_smooth(se=FALSE)+
+   theme_bw()+theme(legend.position="bottom")+
+  xlab("Year")+ylab("Selection Pattern")+
+  scale_colour_manual(values=c("#999999", "#E69F00"), 
+                       name="Selection \n Pattern",
+                       breaks=c("sel", "pg"),
+                       labels=c("Age 9", "Plus Group"))
+
+#**Figure `r iFig=iFig+1; iFig`** Plus group and age 9 selection patterns.
+```
+
+```{r pg,fig.height=4, eval=FALSE}
+vpa=readVPA2Box("/home/laurie/Desktop/kobe/inputs/bfte/2014/vpa/reported/med/bfte2014.c1")
+
+vp=as.data.frame(harvest(vpa)[10,,,,,1]/harvest(vpa)[9,,,,,1],drop=TRUE)
+
+ggplot(melt(dat[,-(2:3)],id="year"),aes(year,value))+
+  geom_point()+
+  geom_line(aes(year,data),data=vp,col="red")+
+  geom_smooth(se=FALSE)+
+  scale_colour_brewer(palette = "Set1")+
+  theme_bw()+
+  xlab("Year")+ylab("F Ratio")
+
+#**Figure `r iFig=iFig+1; iFig`** Plus group
+```
