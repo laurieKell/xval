@@ -53,9 +53,9 @@ library(FLCore)
 theme_set(theme_bw(14))
 options(digits=3)
 
-u=diags:::readVP2BoxIndices(file.path(dirVpa,"new/bfte2017.d1"))
+u=diags:::readVP2BoxIndices(file.path(dirVpa,"ebft/bfte2017.d1"))
 names(u)=c("ESPMarTrap","MarPorTrap","JLL EastMed","JP LL NEA1","JP LL NEA2",
-           "SP BB1",    "SP BB2",    "Aerial",     "larval survey")
+           "SP BB1",    "SP BB2",    "FR Aerial1",    "FR Aerial2",     "larval survey")
 
 rng=ldply(u,function(x) range(x))
 cv =ldply(u,function(x) as.data.frame(index.var(x),drop=TRUE))
@@ -200,14 +200,14 @@ is(u
 
 
 ```{r ccf-n3, fig.height=8,fig.width=8}
-waa=read.table(file.path(dirVpa,"new/bfte2017.d1"),skip=428,nrows=483-428)
+waa=read.table(file.path(dirVpa,"ebft/bfte2017.d1"),skip=428,nrows=483-428)
 waa=waa[waa[,1]%in%c(6,7,9),]
 names(waa)[c(1:2)]=c("name","year")
 waa=melt(waa,id=c("name","year"))
 waa=transmute(waa,name=name,year=year,age=as.numeric(variable),wt=value)
 waa$name=rng[waa$name,1]
 
-paa=read.table(file.path(dirVpa,"new/bfte2017.d1"),skip=264,nrows=422-264)
+paa=read.table(file.path(dirVpa,"ebft/bfte2017.d1"),skip=264,nrows=422-264)
 names(paa)[1:2]=c("name","year")
 paa=melt(paa,id=c("name","year"))
 paa=transmute(paa,name=name,year=year,age=as.numeric(variable),p=value)
@@ -247,7 +247,7 @@ ggplot(baa)+
 **Figure `r iFig=iFig+1; iFig`** Catch biomass compostion, vertical lines show the ages used in calibration.
 
 ```{r ccf-n2, fig.height=8,fig.width=8}
-paa=read.table(file.path(dirVpa,"new/bfte2017.d1"),skip=262,nrows=415-262)
+paa=read.table(file.path(dirVpa,"ebft/bfte2017.d1"),skip=262,nrows=415-262)
 names(paa)[1:2]=c("name","year")
 paa=melt(paa,id=c("name","year"))
 paa=transform(paa,age=as.numeric(variable),n=value)
@@ -270,7 +270,7 @@ ggplot(cca)+
 **Figure `r iFig=iFig+1; iFig`** Catch curve analyses, vertical lines show the ages used in calibration.
 
 ```{r cca}
-caa=read.table(file.path(dirVpa,"new/bfte2017.d1"),skip=24,nrows=71-24)
+caa=read.table(file.path(dirVpa,"ebft/bfte2017.d1"),skip=24,nrows=71-24)
 names(caa)[1]="year"
 caa=transform(melt(caa,id="year"),age=as.numeric(variable))
 caa=transform(ddply(subset(caa,age<10&value!=0),.(year), with, FLife:::cc(age,value)),decade=10*(year%/%10))
