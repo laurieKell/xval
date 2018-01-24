@@ -1,0 +1,1 @@
+1 40*0.     transfer coefficents (1 vector for each area, should all be 0 if only one area)
