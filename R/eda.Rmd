@@ -8,7 +8,7 @@ output: word_document
 ```{r dir, echo=FALSE}
 dirMy="/home/laurence/Desktop/sea++/xval"
 dirDat=file.path(dirMy,"data")
-dirVpa=file.path(dirDat,"inputs/vpa")
+dirVpa=file.path(dirMy,"inputs/vpa")
 dirTex=file.path(dirMy,"tex")
 ```
 
