@@ -219,7 +219,8 @@ paa=transform(paa,decade=10*(year%/%10))
 nms=unique(waa$name)
 
 raa=ddply(subset(paa,!(name%in%nms)),.(name,decade), transform, p=p/sum(p))
-baa=ddply(subset(paa, (name%in%nms)),.(name,decade), transform, p=wt*p/sum(wt*p))
+baa=subset(subset(paa, (name%in%nms)))
+baa=ddply(subset(baa,!(is.na(baa$wt))),.(name,decade), transform, p=wt*p/sum(wt*p))
 ```
 
 ```{r ccf-n4, fig.height=8,fig.width=8}
