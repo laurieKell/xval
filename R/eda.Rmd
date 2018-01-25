@@ -256,7 +256,15 @@ paa=transform(paa,age=as.numeric(variable),n=value)
 paa$n[paa$n==0]=.1
 paa=subset(paa,name<8)
 paa$name=rng[paa$name,1]
-cca=ddply(paa,.(name,year), with, FLife:::cc(age,n))
+#cca=ddply(paa,.(name,year), with, FLife:::cc(age,n))
+ccFn<-function (age, n) 
+{
+  lm = lm(log(n) ~ age)
+  hat = exp(predict(lm))
+  sel = (n/hat)/max(n/hat)
+  data.frame(age = age, obs = n, hat = hat, sel = sel)
+}
+cca=ddply(paa,.(name,year), with, ccFn(age,n))
 
 ggplot(cca)+
   geom_line(aes(age,sel,group=year),col="grey")+
