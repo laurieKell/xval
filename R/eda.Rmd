@@ -200,8 +200,8 @@ is(u
 
 
 ```{r ccf-n3, fig.height=8,fig.width=8}
-waa=read.table(file.path(dirVpa,"ebft/bfte2017.d1"),skip=428,nrows=483-428)
-waa=waa[waa[,1]%in%c(6,7,9),]
+waa=read.table(file.path(dirVpa,"ebft/bfte2017.d1"),skip=427,nrows=483-427)
+waa=waa[waa[,1]%in%c(6,7,10),]
 names(waa)[c(1:2)]=c("name","year")
 waa=melt(waa,id=c("name","year"))
 waa=transmute(waa,name=name,year=year,age=as.numeric(variable),wt=value)
@@ -223,7 +223,7 @@ baa=ddply(subset(paa, (name%in%nms)),.(name,decade), transform, p=wt*p/sum(wt*p)
 ```
 
 ```{r ccf-n4, fig.height=8,fig.width=8}
-nm.=c(nms,"Aerial")
+nm.=c(nms,"FR Aerial1","FR Aerial2")
 
 ggplot(raa)+
   geom_histogram(aes(age,weight=p),bin=1)+
@@ -247,7 +247,7 @@ ggplot(baa)+
 **Figure `r iFig=iFig+1; iFig`** Catch biomass compostion, vertical lines show the ages used in calibration.
 
 ```{r ccf-n2, fig.height=8,fig.width=8}
-paa=read.table(file.path(dirVpa,"ebft/bfte2017.d1"),skip=262,nrows=415-262)
+paa=read.table(file.path(dirVpa,"ebft/bfte2017.d1"),skip=264,nrows=422-264)
 names(paa)[1:2]=c("name","year")
 paa=melt(paa,id=c("name","year"))
 paa=transform(paa,age=as.numeric(variable),n=value)
@@ -270,7 +270,7 @@ ggplot(cca)+
 **Figure `r iFig=iFig+1; iFig`** Catch curve analyses, vertical lines show the ages used in calibration.
 
 ```{r cca}
-caa=read.table(file.path(dirVpa,"ebft/bfte2017.d1"),skip=24,nrows=71-24)
+caa=read.table(file.path(dirVpa,"ebft/bfte2017.d1"),skip=23,nrows=71-23)
 names(caa)[1]="year"
 caa=transform(melt(caa,id="year"),age=as.numeric(variable))
 caa=transform(ddply(subset(caa,age<10&value!=0),.(year), with, FLife:::cc(age,value)),decade=10*(year%/%10))
