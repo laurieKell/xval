@@ -1,6 +1,6 @@
 ---
 title: "Crosssvalidation Meeting, Tokyo 21st 26th Janurary 2018"
-output: html_document
+output: pdf_document
 author: Laurence Kell ^[Sea++], Toshi Kitakado ^[Tokyo University of Marine Science and Technology], Rishi Sharma ^[NOAA]
 ---
 
