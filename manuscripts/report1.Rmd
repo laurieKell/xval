@@ -75,5 +75,12 @@ Five manuscripts will be developed out of this project that will be beneficial t
 
 5) The N. Atlantic Albacore case study will be developed and submitted for a manuscript by April, 2018 for the special issue of Canadian Journal on MSE.
 
+# Online documentation
+
+The overall project is documented here () with links to the other projects, code and other resources (https://github.com/laurieKell/xval/wiki).
+
+Paper 1 on the review is documented here with the figures (https://drive.google.com/drive/folders/1upBPe6GEY3EYNrnpUQHsmq4NbQEafPMN)
+
+
 # Acknowledgements
 We would like to thank ABNJ for making provisions to have an in-person meeting to brainstorm and develop ideas for this project between teh 22nd and 27th of January, 2018.
