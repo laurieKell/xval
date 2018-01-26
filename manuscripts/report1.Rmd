@@ -79,7 +79,9 @@ Five manuscripts will be developed out of this project that will be beneficial t
 
 The overall project is documented here () with links to the other projects, code and other resources (https://github.com/laurieKell/xval/wiki).
 
-Paper 1 on the review is documented here with the figures (https://drive.google.com/drive/folders/1upBPe6GEY3EYNrnpUQHsmq4NbQEafPMN)
+Paper 1 on the review is documented here with the figures (https://drive.google.com/drive/folders/1upBPe6GEY3EYNrnpUQHsmq4NbQEafPMN).
+
+Paper 2 on the testing the predictive power of models used in the EBFT Assessment is here (https://www.overleaf.com/13248070kjkxmgctnqtm)
 
 
 # Acknowledgements
