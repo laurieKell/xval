@@ -47,11 +47,13 @@ new=readVPA2Box(file.path(dirVpa,"new/bfte2017.c1"),m=m)
 
 ## Jackknife the  VPA by removing 1 CPUE observation at a time
 ```{r jack,eval=FALSE}
+source('~/Desktop/flr/diags/R/read-VPA2Box-FLIndices.R', echo=TRUE)
+source('~/Desktop/flr/diags/R/io.VPA2BoxV2.R', echo=TRUE)
 source(file.path(dirMy,'R/jackknife-vpa2box.R'))
 
-jk=jackknife.vpa2box(file.path(dirVpa,"new/bfte2017.c1"),m=m)
+press=jackknife.vpa2box(file.path(dirVpa,"new/bfte2017.c1"),m=m)
 
-save(jk,file=file.path(dirDat,"jk.RData"),compress="xz")
+save(press,file=file.path(dirDat,"press.RData"),compress="xz")
 ```
 
 Returns a list with `FLStocks` and a `data.frame`, the `FLStocks` contains in the first element the fit to all the data and in the second element an FLStock with `iters` for each deleted CPUE observation. The `data.frame` contains the predicted CPUE values from each iteration of the jackknife.
