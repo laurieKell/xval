@@ -11,9 +11,9 @@ knitr::opts_chunk$set(echo = TRUE)
 \begin{center}
 SUMMARY
 \end{center}
-\begin{center}
+\begin
 The meeting in Tokyo from the 22nd to the 27th of January covered aspects of OM design that were related to test whether the assessment model used to set the OM has sufficient predictive power or not. We set up an objective cross-validation technique to demonstrate how this could be used for Eastern Bluefin Tuna Assessment base case scenarios for the 2017 Assessment. In addition, we developed an outline for a series of papers that would come out from this work with the following; i) dealing primarily with a current review of practice used in tRFMO's for OM Model setup, ii) the limitations with the current approaches used, iii) developing objective cross-validation approaches to assess model performance/predictive power for a current assessemnt (EABFT) and a simulation study demonstrating best practices,iv) optimizing some of the grid designs to test Management Procedures, and v) showcasing a case study with Atlantic Albacore. Some of these papers will be sumbitted for teh special issues on MSE's in Canadian Jr. of Fisheries and Aquatic Sciences in April of 2018, and other manuscripts will be completed by September, 2018.    
-\end{center}
+\end
 
 \begin{center}
 KEYWORDS
