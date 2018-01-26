@@ -68,28 +68,20 @@ Five manuscripts will be developed out of this project that will be beneficial t
 
 1) The Review will be completed by March, 2018 and submitted to the special issue of Canadian Journal (CJFAS) by April 1st, 2018.
 
-2) The Eastern Bluefin case study will be completed and tested on the two base case assessments; the VPA and the integrated Stock synthesis model. Procedures were developed at the Tokyp meeting and run for some analysis. The results will be compiled, code archived by March, 2018 and manuscripts completed by September, 2018.
+2) The Eastern Bluefin case study will be completed and tested on the two base case assessments; the VPA and the integrated Stock synthesis model. Procedures were developed at the Tokyo meeting and run for some analysis. The results will be compiled, code archived by March, 2018 and manuscripts completed by mid-June, 2018 for the tuna RFMOs MSE meeting.
 
 3) The simualtion study cross-validation procedure will be developed between March 2018 and June 2018, with a manuscript prepared and submitted by October, 2018.
 
 4) The OM optimal grid design paper will be tested by May, 2018 with a manuscript submitted by September, 2018.
 
-5) The N. Atlantic Albacore case study will be developed and submitted for a manuscript by April, 2018 for the special issue of Canadian Journal on MSE.
+5) The North Atlantic Albacore case study will be developed and submitted for a manuscript by April, 2018 for the special issue of Canadian Journal on MSE.
 
 # Online documentation
 
 The overall project is documented here () with links to the other projects, code and other resources (https://github.com/laurieKell/xval/wiki). Eahc of the papers are in progress here:
 
-1) Paper 1 on the review is documented here with the figures (https://drive.google.com/drive/folders/1upBPe6GEY3EYNrnpUQHsmq4NbQEafPMN).
-
-2) Paper 2 on the testing the predictive power of models used in the EBFT Assessment is here (https://www.overleaf.com/13248070kjkxmgctnqtm).
-
-3) Paper 3 on testing the approach on simul;ated datasets and different platforms is here (https://www.overleaf.com/13356598nmwbxcdyqztq#/51486168/).
-
-4) Paper 4 on optimizing the grid design using partial factorial designs, and multivariate techniques is archived here (https://www.overleaf.com/13376573mdxhycsvkxnq#/51578130/).
-
-5) Paper 5 on Northeast Atlantic MSE is here (https://www.overleaf.com/10490488pwqxgnhwxcts#/39117762/)
-
+# Possible future meetings
+This meeting was very productive as it was in-person, if funds are available, additional meeting could be held in September, 2018, to complete all the components of this project. It will be also beneficial to have the members attend across tuna-RFMOs MSE June meeting to present some of the results.
 
 # Acknowledgements
 We would like to thank ABNJ for making provisions to have an in-person meeting to brainstorm and develop ideas for this project between teh 22nd and 27th of January, 2018.
