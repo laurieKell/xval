@@ -5,6 +5,7 @@ author: Laurence Kell ^[Sea++], Toshi Kitakado ^[Tokyo University of Marine Scie
 ---
 
 ```{r setup, include=FALSE}
+library(knitr)
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
