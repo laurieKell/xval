@@ -81,7 +81,13 @@ The overall project is documented here () with links to the other projects, code
 
 Paper 1 on the review is documented here with the figures (https://drive.google.com/drive/folders/1upBPe6GEY3EYNrnpUQHsmq4NbQEafPMN).
 
-Paper 2 on the testing the predictive power of models used in the EBFT Assessment is here (https://www.overleaf.com/13248070kjkxmgctnqtm)
+Paper 2 on the testing the predictive power of models used in the EBFT Assessment is here (https://www.overleaf.com/13248070kjkxmgctnqtm).
+
+Paper 3 on testing the approach on simul;ated datasets and different platforms is here (https://www.overleaf.com/13356598nmwbxcdyqztq#/51486168/).
+
+Paper 4 on optimizing the grid design using partial factorial designs, and multivariate techniques is archived here (https://www.overleaf.com/13376573mdxhycsvkxnq#/51578130/).
+
+Paper 5 on Northeast Atlantic MSE is here (https://www.overleaf.com/10490488pwqxgnhwxcts#/39117762/)
 
 
 # Acknowledgements
