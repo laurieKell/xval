@@ -5,7 +5,7 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: word_document
 ---
 
-Estimate and compare four different forms of error i.e.
+# Estimate and compare four different forms of error i.e.
 
 + Model errors: from model fits
 + Prediction errors: based on leave-one-out jackknife procedure
@@ -24,8 +24,7 @@ knitr::opts_chunk$set(echo = FALSE)
 
 library(knitr)
 
-opts_chunk$set(cache     =TRUE, 
-               comment   =NA, 
+opts_chunk$set(comment   =NA, 
                warning   =FALSE, 
                message   =FALSE, 
                error     =FALSE, 
@@ -33,7 +32,10 @@ opts_chunk$set(cache     =TRUE,
                eval      =TRUE,
                fig.width =10, 
                fig.height=8,
-               fig.path  ="../tex/xval1-")
+               cache     =TRUE, 
+               fig.path  ="../tex/xval-vpa-",
+               cache.path="../cache/cache-xval-vpa/" 
+               )
 
 iFig=0
 iTab=0
@@ -48,40 +50,35 @@ library(ggplotFL)
 library(FLCore)
 library(diags)
 library(stringr)
+```
 
-source(file.path(dirMy,'R/jackknife-vpa2box.R'))
+```{r source}
+source('~/Desktop/flr/diags/R/io.VPA2BoxV2.R')
+source('~/Desktop/flr/diags/R/jackknife-vpa2box.R')
+source('~/Desktop/flr/diags/R/read-VPA2Box-FLIndices.R')
 ```
 
 ```{r data}
 m=c(0.3800,0.3000,0.2400,0.2000,0.1800,0.1600,0.1400,0.1300,0.1200,0.1000)
 
 vpa=FLStocks("boot"=readVPA2Box(file.path(dirVpa,"ebft/bfte2017.c1"),m=m))
+vpa[["fit"]]=run.vpa2box(file.path(dirVpa,"ebft/sims/bfte2017.c1"),m=m)
 ```
 
 ```{r vpa}
-plot(vpa[["boot"]])
+plot(vpa)
 ```
-**Figure x.`r fig=1; fig`**  VPA
+**Figure `r fig=1; fig`**  VPA used for 2017 assessment advice, blue best fit, pink bootstrap with CIs.
 
-# Model residuals
-```{r me}
-source('~/Desktop/flr/diags/R/read-VPA2Box-FLIndices.R', echo=TRUE)
-source('~/Desktop/flr/diags/R/io.VPA2BoxV2.R', echo=TRUE)
-source(file.path(dirMy,'R/jackknife-vpa2box.R'))
 
-press=run.vpa2box(file.path(dirVpa,"ebft/sims/bfte2017.c1"),m=m)
-
+## Model residuals
+```{r diags}
 dgs=cbind(error="model",iter=0,diags.vpa2box(file.path(dirVpa,"ebft/sims/MINUS0.R")))
 ```
 
-# Prediction residuals 
+## Prediction residuals
 
-```{r jack,eval=FALSE}
-press=jackknife.vpa2box(file.path(dirVpa,"ebft/sims/bfte2017.c1"),m=m)
-
-save(press,file=file.path(dirDat,"press.RData"),compress="xz")
-
-dgs=rbind(dgs,press[["diags"]])
+```{r jack}
+jk-vpa=perr.vpa2box(file.path(dirVpa,"ebft/sims/bfte2017.c1"),m=m)
+save(jk-vpa,file=file.path(dirDat,"jk-vpa.RData"),compress="xz")
 ```
-
-Returns a list with `FLStocks` and a `data.frame`, the `FLStocks` contains in the first element the fit to all the data and in the second element an FLStock with `iters` for each deleted CPUE observation. The `data.frame` contains the predicted CPUE values from each iteration of the jackknife.
