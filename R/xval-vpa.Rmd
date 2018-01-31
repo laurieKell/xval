@@ -211,4 +211,36 @@ plot(vpaRetro)
 ```
 **Figure `r iFig=iFig+1; iFig`**  Retrospectives
 
+```{r xvals}
+fls=c(file.path(dirVpa,"ebft/sims/bfte2017.c1"),
+      file.path(dirVpa,"ebft/sims/2016/bfte2017.c1"),
+      file.path(dirVpa,"ebft/sims/2015/bfte2017.c1"),
+      file.path(dirVpa,"ebft/sims/2014/bfte2017.c1"),
+      file.path(dirVpa,"ebft/sims/2013/bfte2017.c1"),
+      file.path(dirVpa,"ebft/sims/2012/bfte2017.c1"),
+      file.path(dirVpa,"ebft/sims/2011/bfte2017.c1"))
+```
 
+```{r xval1}
+jkVpas=list("2016"=perr.vpa2box(fls[[2]],m=m))
+```
+
+```{r xval2}
+jkVpas=list("2015"=perr.vpa2box(fls[[3]],m=m))
+```
+
+```{r xval3}
+jkVpas=list("2014"=perr.vpa2box(fls[[4]],m=m))
+```
+
+```{r xval4}
+jkVpas=list("2013"=perr.vpa2box(fls[[5]],m=m))
+```
+
+```{r xval5}
+jkVpas=list("2012"=perr.vpa2box(fls[[6]],m=m))
+```
+
+```{r xval6}
+jkVpas=list("2011"=perr.vpa2box(fls[[7]],m=m))
+```
