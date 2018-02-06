@@ -1,0 +1,274 @@
+---
+title: "Crossvalidation I"
+author: "L Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: word_document
+---
+
+# Estimate and compare four different forms of error i.e.
+
++ Model errors: from model fits
++ Prediction errors: based on leave-one-out jackknife procedure
++ Hindcast: Retrospective with projection and then compare predictions with observations
++ One-step: Retrospective with leave-one-out for final year 
+
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+dirMy="/home/laurence/Desktop/sea++/xval"
+dirDat=file.path(dirMy,"data")
+dirVpa=file.path(dirMy,"inputs/vpa")
+dirTex=file.path(dirMy,"tex")
+```
+
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(knitr)
+
+opts_chunk$set(comment   =NA, 
+               warning   =FALSE, 
+               message   =FALSE, 
+               error     =FALSE, 
+               echo      =FALSE, 
+               eval      =TRUE,
+               fig.width =10, 
+               fig.height=8,
+               cache     =TRUE, 
+               fig.path  ="../tex/xval-vpa-",
+               cache.path="../cache/cache-xval-vpa/" 
+               )
+
+iFig=0
+iTab=0
+```
+
+```{r init}
+library(plyr)
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+library(ggplotFL)
+library(FLCore)
+library(diags)
+library(stringr)
+```
+
+#VPA
+```{r source}
+source('~/Desktop/flr/diags/R/io.VPA2BoxV2.R')
+source('~/Desktop/flr/diags/R/jackknife-vpa2box.R')
+source('~/Desktop/flr/diags/R/read-VPA2Box-FLIndices.R')
+source('~/Desktop/flr/diags/R/diags-2box.R')
+```
+
+```{r data}
+nms       =c("FR_AER1","FR_AER2","JPN_LL1_NEA","JPN_LL2_NEA","JPN_LL_EastMed","MOR_POR_TP","MOR_SP_TP","SP_BB1","SP_BB2","WMED_LARV")
+names(nms)=c("AS1",     "AS2",   "JPLL_EM",    "JPLL_NEA",   "LJPLL_NEA2",    "MOR1",      "MOR2",     "SpBB1", "SPBB2", "LS")
+
+m=c(0.3800,0.3000,0.2400,0.2000,0.1800,0.1600,0.1400,0.1300,0.1200,0.1000)
+
+vpa=FLStocks("boot"=readVPA2Box(file.path(dirVpa,"ebft/bfte2017.c1"),m=m))
+vpa[["fit"]]=run.vpa2box(file.path(dirVpa,"ebft/sims/bfte2017.c1"),m=m)
+```
+
+```{r vpa}
+plot(vpa)
+```
+**Figure `r iFig=iFig+1; iFig`**  VPA used for 2017 assessment advice, blue best fit, pink bootstrap with CIs.
+
+
+```{r diags}
+dgs=cbind(error="model",iter=0,diags.vpa2box(file.path(dirVpa,"ebft/sims/MINUS0.R")))
+```
+
+```{r jack}
+jkVpa=perr.vpa2box(file.path(dirVpa,"ebft/sims/bfte2017.c1"),m=m)
+save(jkVpa,file=file.path(dirDat,"jkVpa.RData"),compress="xz")
+```
+
+```{r hindcast,eval=FALSE}
+file  ="/home/laurence/Desktop/sea++/xval/inputs/vpa/ebft/bfte2017.c1"
+dirPrj="/home/laurence/Desktop/sea++/xval/inputs/vpa/ebft/ProjectionsPacth4/6yr"
+
+hc=hindcast(file,dirPrj)
+```
+\newpage
+## Ratio between prediction error and model error
+```{r err-ratio}
+d1=ddply(jkVpa[[2]], .(name),with,data.frame(p.error=var(p.error )^0.5))
+d2=ddply(dgs,        .(name),with,data.frame(m.error=var(residual)^0.5))
+transform(data.frame(d1,m.error=d2[,"m.error"]),ratio=p.error/m.error)
+```
+
+```{r err-m}
+ggplot(dgs)+geom_boxplot(aes(name,residual))+
+  theme_bw()+
+  theme(axis.text.x=element_text(size=20, angle=90, vjust=0.8))
+```
+**Figure `r iFig=iFig+1; iFig`**  Distribution of model error.
+
+```{r err-p}
+ggplot(jkVpa[[2]])+geom_boxplot(aes(name,p.error))+
+  theme_bw()+
+  theme(axis.text.x=element_text(size=20, angle=90, vjust=0.8))
+```
+**Figure `r iFig=iFig+1; iFig`**  Distribution of prediction error.
+
+```{r er-mp}
+ggplot()+
+  geom_point(aes(as.integer(ac(year)),p.error),col="red",data=jkVpa[[2]])+
+  geom_point(aes(year,residual),data=as.data.frame(dgs))+
+  facet_wrap(~name,ncol=3)+
+  theme_bw(16)
+```
+**Figure `r iFig=iFig+1; iFig`**  Comparison of prediction (red) and model error.
+
+```{r ss}
+load(file.path(dirDat,"jk_atl_bftSS3.RData"))
+
+names(cpues)[-1]=c("index","name","year","season","obs","hat","use")
+names(sacpue)=c("index","name","year","season","obs","hat","use")
+cpues=subset(cpues,use==-1)
+```
+
+#SS
+## Ratio between prediction error and model error
+\newpage
+```{r ss-err-ratio}
+d1=ddply(cpues, .(name),with,data.frame(p.error=var(log(obs/hat),na.rm=TRUE)^0.5))
+d2=ddply(sacpue,.(name),with,data.frame(m.error=var(log(obs/hat),na.rm=TRUE)^0.5))
+
+transform(data.frame(d1,m.error=d2[,"m.error"]),ratio=p.error/m.error,
+                                                name =nms[name])
+```
+
+```{r ss-err-m}
+ggplot(transform(sacpue,name=nms[name]))+
+  geom_boxplot(aes(name,log(obs/hat)))+
+  theme_bw()+
+  theme(axis.text.x=element_text(size=20, angle=90, vjust=0.8))
+```
+**Figure `r iFig=iFig+1; iFig`**  Distribution of model error.
+
+```{r ss-err-p}
+ggplot(transform(cpues,name=nms[name]))+
+  geom_boxplot(aes(name,log(obs/hat)))+
+  theme_bw()+
+  theme(axis.text.x=element_text(size=20, angle=90, vjust=0.8))
+```
+**Figure `r iFig=iFig+1; iFig`**  Distribution of prediction error.
+
+```{r ss-er-mp}
+ggplot()+
+  geom_point(aes(year,log(obs/hat)),col="red",data=transform(cpues,name=nms[name]))+
+  geom_point(aes(year,log(obs/hat)),          data=transform(sacpue,name=nms[name]))+
+  facet_wrap(~name,ncol=3)+
+  theme_bw()+
+  theme(axis.text.x=element_text(size=20, angle=90, vjust=0.8))
+```
+**Figure `r iFig=iFig+1; iFig`**  Comparison of prediction (red) and model error.
+
+```{r errors}
+save(sacpue,cpues,jkVpa,dgs,file="/home/laurence/Desktop/tmp/tmp.RData")
+
+rsd=rbind(transmute(cpues,     name=nms[name],error=log(obs/hat),method="SS",type="prediction"),
+          transmute(sacpue,    name=nms[name],error=log(obs/hat),method="SS",type="model"),
+          transmute(jkVpa[[2]],name=name,     error=p.error,     method="VPA",type="prediction"),
+          transmute(dgs,       name=name,     error=residual,    method="VPA",type="model"))
+
+ggplot(rsd)+
+  geom_boxplot(aes(type,error,fill=type))+
+  theme_bw(16)+
+  theme(axis.text.x=element_text(size=10, angle=90, vjust=0.8),legend.position = "bottom")+
+  facet_grid(method~name)
+
+```
+**Figure `r iFig=iFig+1; iFig`**  Comparison of prediction (red) and model error by series for SS and VPA.
+
+
+#Hindcasts
+##VPA
+
+```{r indices}
+idx=readVPA2BoxIndices(file.path(dirVpa,"ebft/sims/bfte2017.d1"))
+
+ggplot(ldply(idx,function(x) as.data.frame(index(x))))+
+  geom_line(aes(year,data))+
+  facet_grid(.id~.,scale="free_y")+
+  xlab("Year")+ylab("CPUE")
+```
+**Figure `r iFig=iFig+1; iFig`**  CPUE series
+
+
+```{r retros}
+dirs=c(file.path(dirVpa,"ebft/sims"),
+       file.path(dirVpa,"ebft/sims/2016"),
+       file.path(dirVpa,"ebft/sims/2015"),
+       file.path(dirVpa,"ebft/sims/2014"),
+       file.path(dirVpa,"ebft/sims/2013"),
+       file.path(dirVpa,"ebft/sims/2012"),
+       file.path(dirVpa,"ebft/sims/2011"))
+xfls=file.path(dirs,"bfte2017.c1")
+
+vpaRetro=FLStocks(mlply(xfls,readVPA2Box,m=m))
+names(vpaRetro)=ac(seq(2017:2011))
+plot(vpaRetro)
+```
+**Figure `r iFig=iFig+1; iFig`**  Retrospectives
+
+
+```{r jk1}
+jkVpas=list("2017"=jackknife.vpa2box(xfls[[1]],m=m))
+```
+
+```{r}
+save(jkVpas,file=file.path(dirDat,"jkVpas.RData"),compress="xz")
+```
+
+```{r jk2}
+jkVpas[["2016"]]=jackknife.vpa2box(xfls[[2]],m=m)
+```
+
+```{r}
+save(jkVpas,file=file.path(dirDat,"jkVpas.RData"),compress="xz")
+```
+
+```{r jk3}
+jkVpas[["2015"]]=jackknife.vpa2box(xfls[[3]],m=m)
+```
+
+```{r}
+save(jkVpas,file=file.path(dirDat,"jkVpas.RData"),compress="xz")
+```
+
+```{r jk4}
+jkVpas[["2014"]]=jackknife.vpa2box(xfls[[4]],m=m)
+```
+
+```{r}
+save(jkVpas,file=file.path(dirDat,"jkVpas.RData"),compress="xz")
+```
+
+```{r jk5}
+
+jkVpas[["2013"]]=jackknife.vpa2box(xfls[[5]],m=m)
+```
+
+```{r}
+save(jkVpas,file=file.path(dirDat,"jkVpas.RData"),compress="xz")
+```
+
+```{r jk6}
+jkVpas[["2012"]]=jackknife.vpa2box(xfls[[6]],m=m)
+```
+
+```{r}
+save(jkVpas,file=file.path(dirDat,"jkVpas.RData"),compress="xz")
+```
+
+```{r jk7}
+jkVpas[["2011"]]=jackknife.vpa2box(xfls[[7]],m=m)
+```
+
+```{r}
+save(jkVpas,file=file.path(dirDat,"jkVpas.RData"),compress="xz")
+```

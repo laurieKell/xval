@@ -1,0 +1,12 @@
+base
+knitr
+ggplot2
+dplyr
+MASS
+lattice
+FLCore
+ggplotFL
+FLife
+plyr
+GGally
+reshape

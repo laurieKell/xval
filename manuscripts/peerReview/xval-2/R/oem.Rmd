@@ -1,0 +1,49 @@
+---
+title: "Performance of model selection and diagnosis by cross-validation: evaluation by simulation"
+subtitle: "Observation Error Model"
+author: "L Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: word_document
+---
+
+# Observation Error Model to simulate different datasets for
+
++ Species
+    + Atlantic bigeye tuna
+    + North East Atlantic Skate
+    + Irish Sea sprat
+
++ Fleets
+    + Adult
+    + Juvenile
+    + Survey
+    
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+dirMy="/home/laurence/Desktop/sea++/xval"
+dirDat=file.path(dirMy,"data")
+dirVpa=file.path(dirMy,"inputs/vpa")
+dirTex=file.path(dirMy,"tex")
+```
+
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(knitr)
+
+opts_chunk$set(comment   =NA, 
+               warning   =FALSE, 
+               message   =FALSE, 
+               error     =FALSE, 
+               echo      =FALSE, 
+               eval      =TRUE,
+               fig.width =10, 
+               fig.height=8,
+               cache     =TRUE, 
+               fig.path  ="../tex/xval-vpa-",
+               cache.path="../cache/cache-xval-vpa/" 
+               )
+
+iFig=0
+iTab=0
+```
+
