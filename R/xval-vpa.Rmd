@@ -1,5 +1,6 @@
 ---
 title: "Crossvalidation I"
+subtitle: "Jackknifes"
 author: "L Kell"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: word_document
@@ -12,17 +13,11 @@ output: word_document
 + Hindcast: Retrospective with projection and then compare predictions with observations
 + One-step: Retrospective with leave-one-out for final year 
 
-```{r, eval=TRUE, echo=FALSE, warning=FALSE}
-dirMy="/home/laurence/Desktop/sea++/xval"
-dirDat=file.path(dirMy,"data")
-dirVpa=file.path(dirMy,"inputs/vpa")
-dirTex=file.path(dirMy,"tex")
-```
 
 ```{r, eval=TRUE, echo=FALSE, warning=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
-
 library(knitr)
+
+knitr::opts_chunk$set(echo = FALSE)
 
 opts_chunk$set(comment   =NA, 
                warning   =FALSE, 
@@ -41,6 +36,23 @@ iFig=0
 iTab=0
 ```
 
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+dirMy="/home/laurence/Desktop/sea++/xval"
+dirDat=file.path(dirMy,"data")
+dirVpa=file.path(dirMy,"inputs/vpa")
+dirTex=file.path(dirMy,"tex")
+
+dirs=c(file.path(dirVpa,"ebft/sims"),
+       file.path(dirVpa,"ebft/sims/2016"),
+       file.path(dirVpa,"ebft/sims/2015"),
+       file.path(dirVpa,"ebft/sims/2014"),
+       file.path(dirVpa,"ebft/sims/2013"),
+       file.path(dirVpa,"ebft/sims/2012"),
+       file.path(dirVpa,"ebft/sims/2011"))
+
+xfls=file.path(dirs,"bfte2017.c1")
+```
+
 ```{r init}
 library(plyr)
 library(dplyr)
@@ -52,12 +64,15 @@ library(diags)
 library(stringr)
 ```
 
-#VPA
 ```{r source}
 source('~/Desktop/flr/diags/R/io.VPA2BoxV2.R')
 source('~/Desktop/flr/diags/R/jackknife-vpa2box.R')
 source('~/Desktop/flr/diags/R/read-VPA2Box-FLIndices.R')
+source('~/Desktop/flr/diags/R/diags-2box.R')
 ```
+
+
+#VPA
 
 ```{r data}
 nms       =c("FR_AER1","FR_AER2","JPN_LL1_NEA","JPN_LL2_NEA","JPN_LL_EastMed","MOR_POR_TP","MOR_SP_TP","SP_BB1","SP_BB2","WMED_LARV")
@@ -184,9 +199,6 @@ ggplot(rsd)+
 **Figure `r iFig=iFig+1; iFig`**  Comparison of prediction (red) and model error by series for SS and VPA.
 
 
-#Hindcasts
-##VPA
-
 ```{r indices}
 idx=readVPA2BoxIndices(file.path(dirVpa,"ebft/sims/bfte2017.d1"))
 
@@ -199,48 +211,67 @@ ggplot(ldply(idx,function(x) as.data.frame(index(x))))+
 
 
 ```{r retros}
-vpaRetro=FLStocks(list("2017"=readVPA2Box(file.path(dirVpa,"ebft/sims/bfte2017.c1"),m=m),
-                       "2016"=readVPA2Box(file.path(dirVpa,"ebft/sims/2016/bfte2017.c1"),m=m),
-                       "2015"=readVPA2Box(file.path(dirVpa,"ebft/sims/2015/bfte2017.c1"),m=m),
-                       "2014"=readVPA2Box(file.path(dirVpa,"ebft/sims/2014/bfte2017.c1"),m=m),
-                       "2013"=readVPA2Box(file.path(dirVpa,"ebft/sims/2013/bfte2017.c1"),m=m),
-                       "2012"=readVPA2Box(file.path(dirVpa,"ebft/sims/2012/bfte2017.c1"),m=m),
-                       "2011"=readVPA2Box(file.path(dirVpa,"ebft/sims/2013/bfte2017.c1"),m=m)))
+vpaRetro=FLStocks(mlply(xfls,readVPA2Box,m=m))
+names(vpaRetro)=ac(seq(2017:2011))
 
 plot(vpaRetro)
 ```
 **Figure `r iFig=iFig+1; iFig`**  Retrospectives
 
-```{r xvals}
-fls=c(file.path(dirVpa,"ebft/sims/bfte2017.c1"),
-      file.path(dirVpa,"ebft/sims/2016/bfte2017.c1"),
-      file.path(dirVpa,"ebft/sims/2015/bfte2017.c1"),
-      file.path(dirVpa,"ebft/sims/2014/bfte2017.c1"),
-      file.path(dirVpa,"ebft/sims/2013/bfte2017.c1"),
-      file.path(dirVpa,"ebft/sims/2012/bfte2017.c1"),
-      file.path(dirVpa,"ebft/sims/2011/bfte2017.c1"))
+
+```{r jk1}
+jkVpas=list("2017"=jackknife.vpa2box(xfls[[1]],m=m))
 ```
 
-```{r xval1}
-jkVpas=list("2016"=perr.vpa2box(fls[[2]],m=m))
+```{r}
+save(jkVpas,file=file.path(dirDat,"jkVpas.RData"),compress="xz")
 ```
 
-```{r xval2}
-jkVpas=list("2015"=perr.vpa2box(fls[[3]],m=m))
+```{r jk2}
+jkVpas[["2016"]]=jackknife.vpa2box(xfls[[2]],m=m)
 ```
 
-```{r xval3}
-jkVpas=list("2014"=perr.vpa2box(fls[[4]],m=m))
+```{r}
+save(jkVpas,file=file.path(dirDat,"jkVpas.RData"),compress="xz")
 ```
 
-```{r xval4}
-jkVpas=list("2013"=perr.vpa2box(fls[[5]],m=m))
+```{r jk3}
+jkVpas[["2015"]]=jackknife.vpa2box(xfls[[3]],m=m)
 ```
 
-```{r xval5}
-jkVpas=list("2012"=perr.vpa2box(fls[[6]],m=m))
+```{r}
+save(jkVpas,file=file.path(dirDat,"jkVpas.RData"),compress="xz")
 ```
 
-```{r xval6}
-jkVpas=list("2011"=perr.vpa2box(fls[[7]],m=m))
+```{r jk4}
+jkVpas[["2014"]]=jackknife.vpa2box(xfls[[4]],m=m)
 ```
+
+```{r}
+save(jkVpas,file=file.path(dirDat,"jkVpas.RData"),compress="xz")
+```
+
+```{r jk5}
+jkVpas[["2013"]]=jackknife.vpa2box(xfls[[5]],m=m)
+```
+
+```{r}
+save(jkVpas,file=file.path(dirDat,"jkVpas.RData"),compress="xz")
+```
+
+```{r jk6}
+jkVpas[["2012"]]=jackknife.vpa2box(xfls[[6]],m=m)
+```
+
+```{r}
+save(jkVpas,file=file.path(dirDat,"jkVpas.RData"),compress="xz")
+```
+
+```{r jk7}
+jkVpas[["2011"]]=jackknife.vpa2box(xfls[[7]],m=m)
+```
+
+```{r}
+save(jkVpas,file=file.path(dirDat,"jkVpas.RData"),compress="xz")
+```
+
