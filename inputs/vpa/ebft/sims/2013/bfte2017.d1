@@ -75,6 +75,7 @@
 # |     |    |      |     TIMING (-1=average, +integer = number of months elapased}
 # |     |    |      |     |     FIRST AGE  LAST AGE   TITLE (IN SINGLE QUOTES)
   1 1 1 4 -1 6 10 'MOR_SP_TP'
+  2 0 1 4 -1 10 10 'MOR_POR_TP'
   3 1 1 4 -1 6 10 'JPN_LL_EastMed'
   4 1 1 4 1 4 10 'JPN_LL1_NEA'
   5 1 1 4 1 4 10 'JPN_LL2_NEA'
