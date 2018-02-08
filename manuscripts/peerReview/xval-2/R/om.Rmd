@@ -1,23 +1,24 @@
 ---
 title: "Performance of model selection and diagnosis by cross-validation: evaluation by simulation"
-subtitle: "Operation Model"
+subtitle: "Conditioning of Operating Model"
 author: "L Kell"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: word_document
 ---
 
-# Operating model to simulate 3 contrasting stocks
+# Operating model to simulate 4 contrasting stocks
 + Atlantic bigeye tuna
-+ North East Atlantic Skate
-+ Irish Sea sprat
++ Thornback Ray
++ Sprat
 + Plaice
 
 ```{r, eval=TRUE, echo=FALSE, warning=FALSE}
 dirMy="/home/laurence/Desktop/sea++/xval"
 dirDat=file.path(dirMy,"data")
-dirVpa=file.path(dirMy,"inputs/vpa")
-dirTex=file.path(dirMy,"tex")
+
+nits=500
 ```
+
 
 ```{r, eval=TRUE, echo=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
@@ -52,6 +53,15 @@ library(ggplotFL)
 library(FLife)
 ```
 
+```{r, source, eval=FALSE}
+source('~/Desktop/flr/FLBRP/R/fwd.R')
+source('~/Desktop/flr/FLash/R/fwd.R')
+source('~/Desktop/flr/FLash/R/fwdControl.R')
+source('~/Desktop/flr/FLife/R/generic.R')
+source('~/Desktop/flr/FLife/R/lopt.R')
+source('~/Desktop/flr/FLife/R/lhPar.R')
+```
+
 ## Life history parameters
 
 ```{r lh}
@@ -64,6 +74,11 @@ ray   =subset(fb,species=="Raja clavata")
 sprat =subset(fb,species=="Sprattus sprattus sprattus")
 bigeye=subset(fb,species=="Thunnus obesus")
 plaice=plaice=subset(fb,species=="Pleuronectes platessa")
+```
+
+```{r devs}
+set.seed(1233)
+srDev=FLife:::rlnoise(nits,FLQuant(0,dimnames=list(year=1:100)),.5,b=0.0)
 ```
 
 ```{r}
@@ -166,8 +181,6 @@ ggpairs(transform(plaice[,-1],linf=log(linf),k=log(k),l50=log(l50)),
 The parameters are then used by `lhEql` to simulate the equilibrium dynamics by combining the spawner/yield per recruit relationships with a stock recruiment relationship.
 
 ```{r eql}
-source('~/Desktop/flr/FLife/R/lhPar.R')
-
 sim<-function(x,niters=500,se=0.3){
   
   mn=aaply(x,1,mean, na.rm=TRUE)
@@ -175,8 +188,7 @@ sim<-function(x,niters=500,se=0.3){
   n =aaply(x,1,function(x) sum(!is.na(x)))
   se=sd/n^0.5
   
-  if (any(is.na(se)))
-    se[is.na(se)]=mn[is.na(se)]*se
+  if (any(is.na(se))) se[is.na(se)]=se
   
   y=data.frame(mn=mn,se=se)
   y=mdply(y,function(mn,se) rnorm(niters,mn,se))[,-(1:2)]
@@ -188,16 +200,16 @@ sim<-function(x,niters=500,se=0.3){
   res}
 
 # create FLPar
-lhRay   =mf2FLPar(ray[,   -c(1)])
-lhSprat =mf2FLPar(sprat[, -c(1,7:8)])
-lhBigeye=mf2FLPar(bigeye[,-c(1,7:8)])
-lhPlaice=mf2FLPar(plaice[,-c(1)])
+lhRay   =FLife:::mf2FLPar(ray[,   -c(1)])
+lhSprat =FLife:::mf2FLPar(sprat[, -c(1,7:8)])
+lhBigeye=FLife:::mf2FLPar(bigeye[,-c(1,7:8)])
+lhPlaice=FLife:::mf2FLPar(plaice[,-c(1)])
 
 # Monte Carlo
-lhRay   =sim(lhRay)
-lhSprat =sim(lhSprat)
-LhBigeye=sim(lhBigeye)
-LhPlaice=sim(lhPlaice)
+lhRay   =sim(lhRay,niters=nits)
+lhSprat =sim(lhSprat,niters=nits)
+lhBigeye=sim(lhBigeye,niters=nits)
+lhPlaice=sim(lhPlaice,niters=nits)
 
 # create FLPar
 lhRay   =lhPar(lhRay)
@@ -210,11 +222,12 @@ eqlRay   =lhEql(lhRay)
 eqlSprat =lhEql(lhSprat)
 eqlBigeye=lhEql(lhBigeye)
 eqlPlaice=lhEql(lhPlaice)
+
 ```
 
 ```{r eqlSave}
-save(lhRay,  lhSprat, lhBigeye, lhPlaice,file=file.path(dirDat,"xval2_lh.RData"))
-save(eqlRay,eqlSprat,eqlBigeye,eqlPlaice, file=file.path(dirDat,"xval2_eql.RData"))
+save(lhRay,  lhSprat, lhBigeye, lhPlaice,file=file.path(dirDat,"xval2_lh.RData"),compress="xz")
+save(eqlRay,eqlSprat,eqlBigeye,eqlPlaice, file=file.path(dirDat,"xval2_eql.RData"),compress="xz")
 ```
 
 ```{r vectorRay}
@@ -240,7 +253,7 @@ ggplot(res)+
 ```{r vectorSprat}
 dat=FLQuants(eqlSprat,"M"=m,"Selectivity"=sel,"Maturity"=mat,"Mass"=stock.wt)
 
-res=ldply(dat,function(x) cast(as.data.frame(quantile(x,probs=c(0.025,0.25,0.5,0.75,0.975))),
+res=ldply(dat,function(x) cast(as.data.frame(quantile(x,probs=c(0.025,0.25,0.5,0.75,0.975),na.rm=TRUE)),
                                age~iter,value="data"))
 
 ggplot(res)+
@@ -293,7 +306,17 @@ ggplot(res)+
 ## Population dynamics
 
 ```{r omRay}
+#http://www.fishbase.org/manual/Key%20Facts.htm
+
+gTime=round(FLife:::genTime(FLPar(aaply(lhRay,1,mean))))
+
+FLBRP:::fbar(eqlRay)=FLBRP:::refpts(eqlRay)["msy","harvest"]%*%FLQuant(c(rep(.1,19),
+                                                                 seq(.1,2,length.out=40),
+                                                                 seq(2,.7,length.out=gTime)[-1],
+                                                                 rep(.7,61)))
+
 omRay=fwd(eqlRay)
+omRay=fwd(omRay,f=fbar(omRay)[,-1],sr=eqlRay,sr.residuals=srDev)
 
 plot(omRay)
 ```
@@ -301,11 +324,14 @@ plot(omRay)
 **Figure `r iFig=iFig+1; iFig`** Time series for thornback ray.
 
 ```{r omSprat}
-library(FLash)
-source('~/Desktop/flr/FLash/R/fwd.R')
-source('~/Desktop/flr/FLash/R/fwdControl.R')
+gTime=round(FLife:::genTime(FLPar(aaply(lhSprat,1,mean))))
 
+FLBRP:::fbar(eqlSprat)=FLBRP:::refpts(eqlSprat)["msy","harvest"]%*%FLQuant(c(rep(.1,19),
+                                                         seq(.1,2,length.out=40),
+                                                         seq(2,.7,length.out=gTime)[-1],
+                                                         rep(.7,61)))[,1:100]
 omSprat=fwd(eqlSprat,maxF=5)
+omSprat=fwd(omSprat,f=fbar(omSprat)[,-1],sr=eqlSprat) #,sr.residuals=srDev,maxF=5)
 
 plot(omSprat)
 ```
@@ -313,7 +339,14 @@ plot(omSprat)
 **Figure `r iFig=iFig+1; iFig`** Time series for sprat.
 
 ```{r omBigeye}
+gTime=round(FLife:::genTime(FLPar(aaply(lhBigeye,1,mean))))
+
+FLBRP:::fbar(eqlBigeye)=FLBRP:::refpts(eqlBigeye)["msy","harvest"]%*%FLQuant(c(rep(.1,19),
+                                                         seq(.1,2,length.out=40),
+                                                         seq(2,.7,length.out=gTime)[-1],
+                                                         rep(.7,61)))[,1:100]
 omBigeye=fwd(eqlBigeye)
+omBigeye=fwd(omBigeye,f=fbar(omBigeye)[,-1],sr=eqlBigeye,sr.residuals=srDev[,,,,,dimnames(m(omBigeye))$iter])
 
 plot(omBigeye)
 ```
@@ -322,22 +355,108 @@ plot(omBigeye)
 
 
 ```{r omPlaice}
+gTime=round(FLife:::genTime(FLPar(aaply(lhPlaice,1,mean))))
+
+FLBRP:::fbar(eqlPlaice)=FLBRP:::refpts(eqlPlaice)["msy","harvest"]%*%FLQuant(c(rep(.1,19),
+                                                         seq(.1,2,length.out=40),
+                                                         seq(2,.7,length.out=gTime)[-1],
+                                                         rep(.7,61)))[,1:100]
 omPlaice=fwd(eqlPlaice)
+omPlaice=fwd(omPlaice,f=fbar(omPlaice)[,-1],sr=eqlPlaice,sr.residuals=srDev[,,,,,dimnames(m(eqlPlaice))$iter])
 
 plot(omPlaice)
 ```
 
 **Figure `r iFig=iFig+1; iFig`** Time series for plaice.
 
-
 ```{r omSave}
 save(omRay,omSprat,omBigeye,omPlaice,file=file.path(dirDat,"xval2_om.RData"),compress="xz")
 ```
 
-
 ## Fleets
 
-```{r fleets}
+```{r sel-ray, fig.height=4}
+selRay              =FLQuants("Adult"=dnormal(ages(catch.sel(eqlRay)),lhRay[c("a1","sl","sr")]))
+selRay[["Juvenile"]]=1-selRay[["Adult"]]
+selRay[["Domed"]]   =dnormal(ages(catch.sel(eqlRay)),rbind(lhRay[c("a1","sl")],FLPar(sr=5)))
+
+res=ldply(selRay,function(x) cast(as.data.frame(quantile(x,probs=c(0.025,0.25,0.5,0.75,0.975))),
+                               age~iter,value="data"))
+
+ggplot(res)+
+  geom_ribbon(aes(age,ymin=`25%`,ymax=`75%`),alpha=0.5,fill="red")+
+  geom_ribbon(aes(age,ymin=`2.5%`,ymax=`97.5%`),alpha=0.1,fill="red")+
+  geom_line(aes(age,`50%`))+
+  facet_wrap(~.id,scale="free")+
+  scale_x_continuous(limits=c(0,10))+
+  xlab("Age")+ylab("")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Selection patterns for thornback ray.
+
+
+```{r sel-sprat, fig.height=4}
+selSprat              =FLQuants("Adult"=dnormal(ages(catch.sel(eqlSprat)),lhSprat[c("a1","sl","sr")]))
+selSprat[["Juvenile"]]=1-selSprat[["Adult"]]
+selSprat[["Domed"]]   =dnormal(ages(catch.sel(eqlSprat)),rbind(lhSprat[c("a1","sl")],FLPar(sr=5)))
+
+res=ldply(selSprat,function(x) cast(as.data.frame(quantile(x,probs=c(0.025,0.25,0.5,0.75,0.975))),
+                               age~iter,value="data"))
+
+ggplot(res)+
+  geom_ribbon(aes(age,ymin=`25%`,ymax=`75%`),alpha=0.5,fill="red")+
+  geom_ribbon(aes(age,ymin=`2.5%`,ymax=`97.5%`),alpha=0.1,fill="red")+
+  geom_line(aes(age,`50%`))+
+  facet_wrap(~.id,scale="free")+
+  scale_x_continuous(limits=c(0,10))+
+  xlab("Age")+ylab("")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Selection patterns for Sprat.
+
+
+
+```{r sel-bigeye, fig.height=4}
+selBigeye              =FLQuants("Adult"=dnormal(ages(catch.sel(eqlBigeye)),lhBigeye[c("a1","sl","sr")]))
+selBigeye[["Juvenile"]]=1-selBigeye[["Adult"]]
+selBigeye[["Domed"]]   =dnormal(ages(catch.sel(eqlBigeye)),rbind(lhBigeye[c("a1","sl")],FLPar(sr=5)))
+
+res=ldply(selBigeye,function(x) cast(as.data.frame(quantile(x,probs=c(0.025,0.25,0.5,0.75,0.975))),
+                               age~iter,value="data"))
+
+ggplot(res)+
+  geom_ribbon(aes(age,ymin=`25%`,ymax=`75%`),alpha=0.5,fill="red")+
+  geom_ribbon(aes(age,ymin=`2.5%`,ymax=`97.5%`),alpha=0.1,fill="red")+
+  geom_line(aes(age,`50%`))+
+  facet_wrap(~.id,scale="free")+
+  scale_x_continuous(limits=c(0,10))+
+  xlab("Age")+ylab("")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Selection patterns for bigeye.
+
+
+```{r sel-plaice, fig.height=4}
+selPlaice              =FLQuants("Adult"=dnormal(ages(catch.sel(eqlPlaice)),lhPlaice[c("a1","sl","sr")]))
+selPlaice[["Juvenile"]]=1-selPlaice[["Adult"]]
+selPlaice[["Domed"]]   =dnormal(ages(catch.sel(eqlPlaice)),rbind(lhPlaice[c("a1","sl")],FLPar(sr=5)))
+
+res=ldply(selPlaice,function(x) cast(as.data.frame(quantile(x,probs=c(0.025,0.25,0.5,0.75,0.975))),
+                               age~iter,value="data"))
+
+ggplot(res)+
+  geom_ribbon(aes(age,ymin=`25%`,ymax=`75%`),alpha=0.5,fill="red")+
+  geom_ribbon(aes(age,ymin=`2.5%`,ymax=`97.5%`),alpha=0.1,fill="red")+
+  geom_line(aes(age,`50%`))+
+  facet_wrap(~.id,scale="free")+
+  scale_x_continuous(limits=c(0,10))+
+  xlab("Age")+ylab("")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Selection patterns for plaice.
+
+```{r saveSel}
+save(selRay,selSprat,selBigeye,selPlaice,file=file.path(dirDat,"sel.RData"),compress="xz")
 ```
 
 
@@ -345,9 +464,3 @@ save(omRay,omSprat,omBigeye,omPlaice,file=file.path(dirDat,"xval2_om.RData"),com
 
 ```{r scen}
 ```
-
-## Projections
-
-```{r}
-```
-

@@ -12,6 +12,7 @@ output: word_document
     + Atlantic bigeye tuna
     + North East Atlantic Skate
     + Irish Sea sprat
+    + Plaice
 
 + Fleets
     + Adult
