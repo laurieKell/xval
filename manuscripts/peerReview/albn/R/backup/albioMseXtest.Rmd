@@ -1,0 +1,104 @@
+---
+title: "Indian Ocean Albacore MSE"
+author: "L Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(knitr)
+
+opts_chunk$set(cache     =TRUE, 
+               comment   =NA, 
+               warning   =FALSE, 
+               message   =FALSE, 
+               error     =FALSE, 
+               echo      =FALSE, 
+               eval      =TRUE,
+               fig.width =10, 
+               fig.height=8,
+               fig.path  ="../tex/om-")
+iFig=0
+iTab=0
+```
+
+```{r init}
+library(plyr)
+library(dplyr)
+library(stringr)
+library(reshape2)
+library(ggplot2)
+library(ggplotFL)
+library(FLCore)
+library(FLBRP)
+library(mpb)
+library(FLife)
+
+dirMy ="/home/laurie/Desktop/MEGAsync/mse/albn"
+dirTex=file.path(dirMy,"tex")
+dirDat=file.path(dirMy,"data")
+dirInp=file.path(dirMy,"inputs")
+```
+
+```{r om}
+load("/home/laurie/Desktop/MEGAsync/mse/alb-io/data/om.RData")
+```
+
+
+```{r mp-oem-ctc}
+plot(catch(om))
+```
+**Figure `r iFig=iFig+1;iFig`.** Catch time series
+
+```{r mp-oem-u}
+plot(stock(om))
+```
+**Figure `r iFig=iFig+1;iFig`.** CPUE time series
+
+```{r xtest}
+sa=biodyn(catch=catch(om))
+u =stock(om)
+```
+
+```{r xtest-2}
+params(sa)["k"]=mean(catch(om))*10
+params(sa)["p"]=0.00000001
+sa=fwd(sa,catch=catch(sa))
+
+setParams(sa)=u
+setControl(sa)=params(sa)
+control(sa)[c("q1","sigma1"),"phase"]=-2
+```
+
+```{r xtest-3}
+sa=fit(sa,u)
+
+plot(sa)
+```
+**Figure `r iFig=iFig+1;iFig`.** Fits
+
+```{r bmsy-1}
+plot(FLQuants(SA=stock(sa)[,-66],OM=ssb(om)))
+```
+**Figure `r iFig=iFig+1;iFig`.** B
+
+```{r bmsy-2}
+plot(FLQuants(SA=stock(sa)[,-66]%/%bmsy(sa),OM=ssb(om)%/%rpts["SBMSY"]))
+```
+**Figure `r iFig=iFig+1;iFig`.** B/BMSY
+
+
+```{r rmse}
+hist((apply((stock(sa)[,-66]%/%stock(om))^2,6,sum)/dim(om)[6])^0.5)
+```
+**Figure `r iFig=iFig+1;iFig`.** RMSE
+
+
+```{r rmse-2}
+hist((apply(((stock(sa)[,-66]%/%bmsy(sa))%/%(ssb(om)%/%rpts["SBMSY"]))^2,6,sum)/dim(om)[6])^0.5)
+```
+**Figure `r iFig=iFig+1;iFig`.** RMSE
+
+
