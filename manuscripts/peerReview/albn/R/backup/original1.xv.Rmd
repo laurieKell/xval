@@ -1,0 +1,196 @@
+---
+title: "ALB OEM"
+author: "Laurence Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+
+```{r knitr, echo=FALSE}
+library(knitr)
+
+opts_chunk$set(comment=NA, 
+               fig.width =8, 
+               fig.height=5,
+               fig.path  ="../tex/oem-",
+               warning=FALSE, 
+               message=FALSE, 
+               error  =FALSE, 
+               echo   =FALSE, 
+               eval   =TRUE,
+               cache  =TRUE)
+iFig=0
+```
+
+```{r init, echo=FALSE}
+library(ggplot2)
+library(reshape)
+library(plyr)
+library(dplyr)
+library(FLCore)
+library(FLBRP)
+library(ggplotFL)
+library(diags)
+library(mpb)
+
+rodFn=FLife:::rodFn
+```
+
+#Biomass Dynamic
+
+```{r biodyn-cpue}
+data=read.csv("/home/laurie/ownCloud/ALBAss/ALBAss/Analysis/biodyn/indices/ALB_N_CPUE_MASTER_20160503_v2.csv")
+cpue=FLQuants(dlply(data,.(fleet), with, as.FLQuant(data.frame(year=year,data=stdcpue))))
+
+save(cpue,file="/home/laurie/Desktop/MEGAsync/mse/albn/data/cpue.RData")
+
+plot(cpue[-4])+
+  theme_bw()+theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Time series of CPUE indices used in biomass dynamic assessment model.
+
+```{r}
+library(mpb)
+
+load("/home/laurie/Desktop/SCRS/ownCloud-2016/ALBAss/ALBAss/Analysis/biodyn/albn2016/data/TFGO.RData")
+```
+
+
+```{r biodyn-rsdl}
+bd=bds2[[1]]
+dgs=transform(bd@diags,fleet=name)
+
+ggplot(subset(dgs,!is.na(residual)))+
+  geom_abline(aes(slope=0,intercept=0))+
+  geom_point(aes(year,residual),shape=21)+
+  geom_smooth(aes(year,residual),se=FALSE)+
+  facet_grid(.~fleet,scale="free",space="free")+
+  xlab("Year")+ylab("Residuals")+
+  theme_bw()+theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`.**  Residuals from fit to CPUE by biomass dynamic assessment model. 
+
+
+```{r biodyn-ar}
+ggplot(aes(residual,residualLag), data=dgs)+
+  geom_point()+
+  geom_smooth(method="lm")+
+  geom_abline(aes(slope=0,intercept=0))+
+  facet_wrap(~fleet,scale="free")+
+  xlab(expression(Residual[t]))+ylab(expression(Residual[t]))+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Autocorrelation of residuals (lag 1) from fit to CPUE by biomass dynamic assessment model.
+
+
+```{r biodyn-acf, fig.height=5}
+ggplot(ddply(subset(dgs,!is.na(residual)),.(fleet), with,
+             data.frame(lag  =0:10,
+                        value=c(acf(residual,plot=F,lag.max=10)[[1]]))))+
+  geom_abline(aes(slope=0,intercept=0))+
+  geom_linerange(aes(x=lag,ymin=0,ymax=value))+
+  facet_wrap(~fleet)+
+  xlab("Lag")+ylab("ACF")+
+  theme_bw()+theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Autocorrelation of residuals from fit to CPUE by biomass dynamic assessment model.
+
+```{r biodyn-2}
+ggplot(aes(qqx,qqy), data=dgs)+
+  geom_point()+
+  geom_line(aes(qqx,qqHat))+
+  facet_wrap(~fleet,scale="free")+
+  xlab(expression(Quantile[expected]))+ylab(expression(Quantile[observed]))+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Quantile Quantile plot of residuals from fit to CPUE by biomass dynamic assessment model
+
+```{r new}
+library(ggplot2)
+library(reshape)
+library(plyr)
+library(dplyr)
+library(FLCore)
+library(FLBRP)
+library(ggplotFL)
+library(diags)
+library(mpb)
+
+load("/home/laurie/Desktop/SCRS/ownCloud-2016/ALBAss/ALBAss/Analysis/biodyn/albn2016/data/TFGO.RData")
+load("/home/laurie/Desktop/MEGAsync/mse/albn/data/cpue.RData")
+
+bd=new("biodyn")
+
+for (i in slotNames(bds2[[1]])[-4])
+  slot(bd,i)=slot(bds2[[1]],i)
+
+bd@indices=cpue[-4]
+
+bd=fit(bd)
+
+bd@indices=FLQuants(llply(bd@indices,propagate, 10))
+bd@catch=propagate(bd@catch,10)
+
+bdi=fit(bd)
+
+FLQuantJK<-FLQuant
+jk=fit(bd,jackknife(cpue[-4]))
+
+pjk=FLCore:::FLParJK(params(bdi), orig=params(bd))
+
+setMethod("jackSummary", signature(object="FLParJK"),
+  function(object,...) {
+            
+   nms <-names(dimnames(object))
+   idx <-seq(length(nms))[nms != 'iter']
+   n   <-dims(sim)$iter 
+            
+   mn  <-object
+   u   <-sim
+   mnU <-apply(u, idx, mean)   
+            
+   SS <-apply(sweep(u, idx, mnU,"-")^2, idx, sum)
+            
+   bias <- (n-1)*(mn-mnU)
+   se   <- sqrt(((n-1)/n)*SS)
+   
+   cov  <-FLPar(cov(model.frame(u)[,dimnames(u)[[1]]])*(n-1)*(n-1)/n)
+   
+   return(FLPars(hat=mn, mean=mnU, se=se, bias=bias, cov=cov))})
+
+
+jackSummary(params(bd))
+
+# jacknife FLQuants
+jk    =mcf(FLQuants(llply(cpue,jackknife)))
+datYrs=laply(jk,function(x) aaply(x,2,function(x) !all(is.na(x))))
+
+jk2=FLQuants(mlply(seq(length(cpue)), function(x,n=sum(datYrs)) 
+         FLQuant(NA,dimnames=list(year=dimnames(datYrs)[[2]],iter=seq(n)))))
+  
+aaply(datYrs,1,sum)
+
+    for (j in seq(length(cpue))[-i]){
+
+      # get other indices dims right
+      bigItUp=propagate(cpue[[j]],dim(cpue[[j]])[2])
+
+      # create an FLQuant that can be JKed
+      jk=combine(jk[[i]],bigItUp)
+      }
+```
+
+**Figure `r iFig=iFig+1; iFig`.** 
+
+```{r new-2}
+library(plyr)
+
+jk=mcf(FLQuants(llply(cpue,jackknife)))
+jk=combine(jk[[1]],jk[[2]])
+
+```
+

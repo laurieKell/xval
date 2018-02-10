@@ -1,0 +1,655 @@
+---
+title: "Conditioning the North Atlantic Albacore Operating Model on Multifan-CL"
+subtitle: "Validation"
+author: "L Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+
+<!-- ## Agreed validation steps before advice will be given -->
+
+<!-- *  Use the same random deviates across all scenarios, and check stability of higher and lower percentiles within and across OM/MP scenarios. i.e. run for 1000 iters for selected OM/MP combinations. -->
+<!-- *  To check SRR run with high F’s and the dynamics are working the way they should, i.e contrast in the Spawning stock size and what it gives on recruitment -->
+<!-- *  Conduct a crosstest, i.e. run OM without feedback generate catch and CPUE fit SA, every 3 years and compare the OM and stock assessment (SA) -->
+<!-- *  Use OEM in cross test -->
+<!-- *  For all OM/MP trials run simple F=Ftarget projection, to check dynamics -->
+<!-- *  Run OM with feedback for an F target of FMSY  and compare to F projection -->
+<!-- *  Run a OM with feedback for an F target of FMSY and an Btreshold of BMSY, compare to above. -->
+<!-- *  Run a OM with feedback for an F target of FMSY and an Btreshold of BMSY plus TAC bounds of 20, 25 and 30%, compare to above. -->
+<!-- *  Run scenarios using a factorial design, i.e. main effects, 1st, 2nd, ... order interactions, see if you can predict the performance indicators -->
+<!-- *  Compare OM and MP reference points -->
+<!-- *  Check TAC output by MP and Catch taken from OM, iteration by iteration. -->
+<!-- *  OM conditioning, of historic and future, i.e. calculate the OM production functions and compare trajectories to these. -->
+<!-- *  Compare OM reference points and statistics such as K, r, … to MP values -->
+<!-- *  Check SA, e.g. hitting bounds, convergence -->
+<!-- *  Compare TAC output from MP compared to Catch from OM -->
+
+```{r, echo=FALSE, warning=FALSE}
+library(knitr)
+
+knitr::opts_chunk$set(echo = FALSE)
+
+opts_chunk$set(cache     =TRUE, 
+               cache.pathe="cache/conditioning",
+               comment   =NA, 
+               warning   =FALSE, 
+               message   =FALSE, 
+               error     =FALSE, 
+               echo      =FALSE, 
+               eval      =TRUE,
+               fig.width =8, 
+               fig.height=4,
+               fig.path  ="../tex/conditioning",
+               cache.path="../cache/conditioning")
+iFig=0
+iTab=0
+```
+
+```{r data}
+library(FLCore)
+library(plyr)
+
+dirMy  ="/home/laurence/Desktop/mse/albn"
+dirInp =file.path(dirMy,"inputs")
+dirMfcl=file.path(dirInp,"mfcl")
+dirDat =file.path(dirMy,"data")
+
+mfcl=file.path(dirMfcl,system(paste("ls",dirMfcl),intern=TRUE))
+
+omKey=mdply(system(paste("ls",dirMfcl),intern=TRUE),function(x) unlist(strsplit(x,"_")))[,-1]
+names(omKey)=c("Run","M","Steepness","Catchability")
+
+nms=c("Spain BB","Spain France\nTroll","Spain France\nEarly BB",
+      "Portugal\nBB","Japan\nLL Target","Japan\nLL tra","Japan\nLL Bycatch",
+      "Chinese-Taipei\nLL Early","Chinese-Taipei\nLL Mid","Chinese-Taipei\nLL Late",
+      "KoreaPaCu LL","Other surface")
+
+save(omKey,file=file.path(dirDat,"omKey.RData"))
+```
+
+
+```{r funcs}
+source('~/Desktop/flr/FLCore/R/io.MFCL.R')
+
+##gets MFCL plot rep and par files to read in FLStock
+getOMFiles<-function(x){
+  f=system(paste("ls",x),intern=TRUE)
+
+  r=f[grep(".rep",f)]
+  r=sort(r[grep("plot-",r)])
+  r=r[length(r)]
+  
+  p=sort(f[grep(".par",substr(f,nchar(f)-3,nchar(f)))])
+  p=p[length(p)]
+  
+  file.path(x,c(r,p))}
+```
+
+#  OM conditioning
+
+The Operating Model (OM) is a mathematical–statistical model used to describe the actual resource dynamics in simulation trials and to generate resource monitoring data when projecting forward. The OM simulates historical and future dynamics and psuedo data for use in the Management procedure (MP).
+
+An OM is conditioned on available information by adjusting the parameter values to ensure that it is consistent with this information, and hence reflects assumptions that are plausible this process maybe, but does not have to be similar to an assessment; the conditioning provides the initial conditions for projecting resource dynamics forward.
+
+The OEM is the component of the OM that generates fishery-dependent and/or fishery-independent resource monitoring data for input to an MP.
+
+## Multifan-CL
+
+The OM was conditioned by fitting Multifan-Cl to a range of scenarios based on the 2013 ICCAT North Atlantic Albacore Stock Assessment i.e.
+
++ **Base** Model specifications provided in SCRS/2013/058
++ **Alt1** Includes Chinese Taipei LL SF data and allows dome-shaped selectivity for this fleet
++ **Alt2** Model starts in 1950
++ **Alt3** All SF data down-weighted
++ **Alt4** Japanese LL CPUE data no longer down-weighted
++ **Alt5** Includes the Chen and Watanabe age-specific natural mortality vector (Santiago 2004)
++ **Alt6** Excludes final 4 years of data (2008 – 2011)
++ **Alt7** Includes equal weights for Japan and Chinese Taipei LL SF and CPUE data (similar to 2009 continuity run)
++ **Alt8** Includes total catch in weight but effort calculated from CPUE in numbers (incorrect effort data calculation)
++ **Tag**  Includes tagging data for release events that occurred between 1988 and 1991
+
+Additional scenarios were considered corresponding to
+
++ **Natural Mortality** three levels
++ **Steepness** four levels
++ **Trend in catchability** two levels
+
+# Validation Steps
+
+Multifan-CL is a fully integrated model, where growth and catch-at-age structure are estimated simultaneously with recruitment, selectivity, catchability, natural mortality, and other parameters.
+
+## Stock Recruitment Relationship
+
+In Multifan-CL a Beverton-Holt stock-recruitment relationship (SRR) is assumed and the deviations between the recruitment predicted by the SRR and the recruitment, used in the age structured dynamics when fitting, are  estimated and included in the likelihood. This means that the dynamics are driven by the recruitment, i.e. the relationship is of recruit-stock form rather than stock-recruit. 
+
+**Figure 4** shows the estimates of steepness derived from the S-R pairs estmated by Multifan-CL as used in the dynamics, while **Figure 5** shows the posteriors from Multifan-CL. **Figure 6** plots the crosscorrelations between the estimated recruitments (i.e. the deviates plus the expected recruits) and shows that as the lags are all positive that large stock sizes are driven by the incoming recruitment rather than the SRR.
+
+**Figure 8** shows little evidence for auto-correlation between deviates, while **Figure 9** shows the estmiated regimes using the STARS algorithm.
+
+**Figures 12 and 13** show simulated recruitments with and without regime shifts.
+
+## Observation Error Model
+
+The Observation Error Model (OEM) simulates psuedo data from the OM for use in the MP. The objective of MSE is to ensure that advice is robust it must therefore model the characteristics of the actual data used to provide the advice. 
+
+A main concern expressed by stakeholders was that the CPUE time series simulated in the OEM did not correspond to the ones actually used in the assessment, i.e.
+
++ In the 2016 MSE a single CPUE had been used which corresponded to the total biomass, whiile q had been fixed at 1 so that the index represented an unbiased estimate of absolute abundance.
+ + In the 2017 MSE, only four indices which started in 1980 and were available for the entire simulated period, although 5 were used in the assessment, only 1 started in 1980, the others were of shorter duration and the Japanese longline bycatch was no longer representative of albacore abundance and so was trunacted in 2012 (**Figure 17**). In addition the assumed selection patterns for all OM scenarios were taken from the base case.
+ 
+ **Figure 14** shows that the selection patterns vary by OM scenario and **Figure 16** shows simulated CPUEs by scenario. These show that the OEM needs to be based on the parameters estimated by each OM scenario.  
+
+**Figures 17** onwards show the diagnostics from the 2016 biomass dynamic assessment, which should be used to parameterise the OEM. 
+
+```{r OM-pg40, eval=!FALSE}
+library(FLife)
+
+stks=FLStocks(mlply(mfcl, function(x)
+    readMFCL(getOMFiles(x))))
+
+rng=ldply(stks,range)
+
+data(teleost)
+par=iter(teleost,"Thunnus alalunga")
+par[c("a","b")]=c("a"=1.34e-5,"b"=3.1066)	
+
+fn4<-function(stk,par){
+  
+  fn<-function(x,a,b,waa,fit=TRUE){
+        par=FLPar(x)
+        hat=len2wt(vonB(ages(waa),par),FLPar("a"=a,"b"=b))
+        if (!fit) return(hat)
+        sum((waa-hat)^2)}
+  
+  x=c(t0=par["t0"],linf=par["linf"],k=par["k"])
+
+  vb=optim(x,fn,a=par["a"],b=par["b"],waa=stock.wt(stk)[-dim(stk)[1]])$par
+  
+  sr=fmle(as.FLSR(stk,model="geomean"),control=list(silent=TRUE))
+  res=setPlusGroup(stk,40)
+  res=fwd(res,catch=catch(res)[,-1],sr=sr,sr.residuals=exp(residuals(sr)))
+
+  stock.wt(res)   =fn(vb,a=par["a"],b=par["b"],stock.wt(res),fit=FALSE)
+  catch.wt(res)   =stock.wt(res)
+  landings.wt(res)=stock.wt(res)
+  discards.wt(res)=stock.wt(res)
+  
+  stock(res)=computeStock(res)
+  catch(res)=computeCatch(res)
+  
+  res}
+
+oms=FLStocks(llply(stks,fn4,par=par))
+names(oms)=names(stks)
+
+save(stks,rng,oms,file=file.path(dirDat,"oms.RData"),compress="xz")
+```
+
+```{r OM-rec, eval=!FALSE}
+fn1<-function(x){
+      cat(x,file="/home/laurence/Desktop/tmp/chk.txt")
+      fmle(as.FLSR(readMFCL(getOMFiles(x)),model="bevholt"),control=list(silent=TRUE))}
+
+fn2<-function(res){
+      rec=rec(res)
+      ssb=ssb(res)
+      rsd=residuals(res)
+      dimnames(rsd)$year=dimnames(ssb)$year
+      
+      df=model.frame(FLQuants(rec=rec,ssb=ssb,residual=rsd),drop=TRUE)
+      names(df)[1]="yearclass"
+      df}
+
+fn3<-function(x){
+  tmp=scan(getOMFiles(x)[1],sep="\n",what=as.character())
+  bh =tmp[grep("Bever",tmp)[1]+1]
+  bh =as.numeric(strsplit(bh," ")[[1]])
+  bh[!is.na(bh)]}
+ 
+srr=FLSRs(mlply(mfcl,fn1))
+   
+names(srr)=seq(length(srr))
+
+df  =ldply(srr,fn2)
+par =laply(srr,params)
+par =FLPar(t(par))
+
+cov=laply(srr[1:240],vcov)
+vcv=as(aperm(cov,c(2,3,1)),"FLPar")
+names(vcv)=c("params","params","iter")
+dimnames(vcv)[[3]]=seq(240)
+
+bh =ldply(mfcl, fn3)
+names(bh)=c("a","b","s")
+bf=as(bh,"FLPar")
+
+save(df,par,vcv,bh,srr,file=file.path(dirDat,"srr.RData"))
+```
+
+```{r OM-brp}
+load(file.path(dirDat,"oms.RData"))
+
+library(FLBRP)
+
+eqls=FLBRPs(mlply(seq(length(oms)), function(x,om=oms,sr=srr) brp(FLBRP(om[[x]],sr=sr[[x]],nyears=5))))
+
+save(eqls,file=file.path(dirDat,"eqls.RData"),compress="xz")
+```
+
+```{r OM-2007}
+dat=merge(cbind(base=as.numeric(dimnames(subset(omKey,Run=="Base"))[[1]]),subset(omKey,Run=="Base"))[,-2],
+          cbind(hcst=as.numeric(dimnames(subset(omKey,Run=="Alt6"))[[1]]),subset(omKey,Run=="Alt6"))[,-2])
+
+hcst=FLStocks(mlply(dat[,c("base","hcst")], function(base,hcst) {
+        x=fwdWindow(oms[[hcst]],end=2011,eqls[[hcst]])
+        x=fwd(x,catch=catch(oms[[base]])[,ac(2008:2011)],sr=eqls[[hcst]],sr.deviates=residuals(srr[[base]]))
+        x}))
+
+oms[dat$hcst]=hcst
+
+save(stks,rng,oms,file=file.path(dirDat,"om.RData"),compress="xz")
+```
+
+## Biological parameters
+
+```{r OM-m}
+ggplot(ldply(eqls,function(x) as.data.frame(m(x)[1:10],drop=T)))+
+  geom_line(aes(age,data,group=X1))+
+  theme_bw()+xlab("Age")+ylab("Natural Mortality")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Natural Mortality vectors showing the three levels of M, and the Chen Watannabe vector that assumes scenescence.
+
+
+```{r OM-mass}
+ggplot(ldply(eqls,function(x) as.data.frame(stock.wt(x)[1:20],drop=T)))+
+  geom_line(aes(age,data,group=X1))+
+  theme_bw()+xlab("Age")+ylab("Mass-at-age (Kg)")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Mass-at-age.
+
+
+```{r OM-mat}
+ggplot(ldply(eqls,function(x) as.data.frame(mat(x)[1:20],drop=T)))+
+  geom_line(aes(age,data,group=X1))+
+  theme_bw()+xlab("Age")+ylab("Proportion Mature-at-age")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Proportion mature-at-age.
+
+## Recruitment dynamics
+
+The stock recruitment relationship and the recruitment deviates are estimated as part of the Multifan-CL fitting procedure. A prior was used for steepness.
+
+
+Base run configuration and base tests to assess it is doing what we think it should, i.e. the steepness formulation should not be driven by the prior for recruitment dynamics. 
+
+```{r steepness-mfcl}
+spr0=ldply(eqls,function(x) c(spr0(x)))
+par=laply(srr[1:240],function(x) c(params(x)))
+par=as.data.frame(cbind(par,spr0=spr0[,2]))
+names(par)=c("a","b","spr0")
+
+s=mdply(par,function(a,b,spr0) FLife:::sv(FLPar(c(a=a,b=b)),"bevholt",spr0=spr0)$s)
+names(s)[4]="s"
+```
+
+```{r steepness-actual}
+ggplot(cbind(s,omKey))+
+  geom_histogram(aes(s),binwidth=.01)+
+  facet_grid(Steepness~M)+
+  theme_bw()+xlab("Steepness")+ylab("Frequency")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Steepness of the stock recruitment relationship estimated from on the stock recruitment parirs estimated by Multufan-CL.
+
+```{r srr-ccf}
+ccf(c(rec.obs(eqls[[1]])),c(ssb.obs(eqls[[1]])))
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Crosscorrelations between recruitment and SSB, the correlations are dominated by positive lags showing that the dynamics are drive by incoming recruitments, i.e. they are of recruit-stock form.
+
+
+```{r steepness-mfcl-plot}
+ggplot(cbind(bh,omKey))+
+  geom_histogram(aes(s),binwidth=.01)+
+  facet_grid(Steepness~M)+
+  theme_bw()+xlab("Steepness")+ylab("Frequency")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Steepness of the stock recruitment relationship, estimated by Multifan-CL. 
+
+
+```{r OM-srr1, fig.height=6, fig.width=6}
+library(ggplot2)
+
+ggplot(aes(ssb,rec),data=df)+
+  geom_point(shape=21,fill="blue",col="grey",size=0.75)+
+  geom_smooth(se=FALSE,method="loess")+
+  theme(legend.position="none")+
+  xlab("SSB")+ylab("Recruits")+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Stock recruitment pairs, with loess smoother.
+
+```{r OM-srr2}
+ggplot(aes(as.factor(yearclass),residual),data=df)+
+  geom_boxplot(shape=21,fill="blue",col="grey",size=0.75)+
+  theme(legend.position="none")+
+  xlab("Year class")+ylab("Residuals")+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Recruitment residuals.
+
+```{r OM-srr3, fig.height=6, fig.width=6}
+ggplot(ddply(df,.(X1), with, data.frame(r1=residual[-length(residual)],r=residual[-1])))+
+  geom_point(aes(r,r1),shape=21,fill="blue",col="grey",size=0.75)+
+  theme(legend.position="none")+
+  geom_smooth(aes(r,r1),method="lm")+
+  xlab(expression(Residual[t]))+ylab(expression(Residual[t+1]))+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Autocorrelation in residuals
+
+```{r OM-srr4}
+load(file.path(dirDat,"srr.RData"))
+
+star=ddply(df,.(X1), with, FLife:::rod(as.FLQuant(data.frame(data=residual,year=yearclass))))
+
+ggplot(ddply(star,.(X1,regime,year),with, mean(data)))+
+  geom_line(aes(year,V1,group=paste(regime,X1),col=as.numeric(X1)))+
+  theme(legend.position="none")+
+  xlab("Year class")+ylab("Residuals")+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Regimes in recruitment residuals
+
+```{r OM-srr5}
+rg=ddply(star,.(X1,regime,year),with, mean(data))
+
+rg2=transform(data.frame(rg[seq(1,dim(rg)[1],2),],
+                         end=rg[seq(2,dim(rg)[1],2),"year"]),length=end-year+1)
+
+rg3=ddply(rg2,.(X1),with,data.frame(regime=regime[-1],change=V1[-1]-V1[-length(V1)]))
+
+rg4=merge(subset(rg2,X1!=1),rg3)
+
+rg5=transform(merge(df[,c("X1","yearclass","residual")],
+                   ddply(rg,.(X1,regime),with,data.frame(yearclass=year[1]:year[2],mean=V1[1]))),
+             residual=residual-mean)
+
+regimeLn=subset(merge(rg2,ddply(rg2,.(X1), function(x) data.frame(check=max(as.numeric(x$regime))>2))),check&regime!=1)$length
+regimeCh=rg3$change
+```
+
+
+```{r OM-srr6}
+ggplot(aes(yearclass,residual),data=rg5)+
+  geom_point(shape=21,fill="blue",col="grey",size=0.75)+
+  theme(legend.position="none")+
+  xlab("Year class")+ylab("Residuals")+
+  theme_bw()
+
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Recruitment residuals with regimes removed
+
+```{r OM-srr7}
+library(ggplotFL)
+
+recRegime<-function(n,yrs,ln,ch){
+  
+  fn<-function(iter,yrs,ln,ch){  
+     regime=1
+     res   =data.frame(regime=rep(regime,sample(ln,1)),
+                       data  =sample(ch,1))
+      while (dim(res)[1]<length(yrs)){
+         regime=regime+1
+          res=rbind(res,data.frame(regime=rep(regime,sample(ln,1)),
+                                   data=sample(ch,1)))}
+         
+      res=data.frame(year=yrs,res[seq(length(yrs)),])[,-2]}
+           
+   as.FLQuant(mdply(data.frame(iter=seq(n)), fn, yrs=yrs,ln=ln,ch=ch))}
+  
+## Get random samples
+n   =1000
+hYrs=1975:2007
+yrs =2012:2040
+
+srRegime=recRegime(n,yrs=2012:2040,regimeLn,regimeCh)
+
+dev2=data.frame(year=rep(yrs,n),
+                iter=rep(seq(n),each=length(yrs)),
+                smpl=sample(hYrs,n*length(yrs),TRUE))
+srDevs=FLQuants(mlply(seq(length(srr)), function(x) 
+                 as.FLQuant(transform(dev2,data=c(residuals(srr[[x]])[,ac(smpl)]))[,-3])))
+
+save(srDevs,srRegime,file=file.path(dirDat,"srDev.RData"))
+
+plot(srDevs[[1]]+srRegime)+
+  geom_line(aes(year,data),data=as.data.frame(iter(srDevs[[1]],78)))+
+  geom_line(aes(year,data),data=as.data.frame(iter(srDevs[[1]]+srRegime,78)),col="red")+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Recruitment deviates for the same scenario and random number seed, with (red) and without (black) regime shift.
+
+
+```{r OM-srr8}
+plot(srDevs[[2]]+srRegime)+
+  geom_line(aes(year,data),data=as.data.frame(iter(srDevs[[2]],78)))+
+  geom_line(aes(year,data),data=as.data.frame(iter(srDevs[[2]]+srRegime,78)),col="red")+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Recruitment deviates for two different scenario for the same random number seed with regime shift.
+
+# OEM
+
+How is the OE component being implemented.
+
+```{r OEM, eval=!FALSE}
+library(FLMethLen)
+library(reshape)
+
+fn6<-function(x){
+  
+   caa=mdply(1:12, function(fleet)
+       alkMFCL(file.path(x,"length.fit"),
+               file.path(x,"albN.frq"),fleet)$caa)
+    caa=transform(caa,year=as.numeric(ac(year)),
+                      age =as.numeric(ac(age)))
+    caa=ddply(caa,.(year,age,X1), with, data.frame(data=sum(data)))
+    caa=ddply(caa,.(year,age),    transform, data=data/sum(data,na.rm=TRUE))
+    pca=FLQuants(dlply(caa,.(X1), with, as.FLQuant(data.frame("age"=age,"year"=year,"data"=data))))
+    pca=FLQuants(llply(pca, function(x) x[seq(dim(x)[1])]))
+    saa=FLQuants(llply(pca,function(x) apply(x,1,mean,na.rm=T)))
+    names(saa)=nms
+    
+    as.data.frame(saa,drop=TRUE)}
+
+saa=mdply(mfcl,fn6)
+
+save(saa,file=file.path(dirDat,"saa.RData"),compress="xz")
+```
+
+```{r OEM-sel, fig.height=10}
+ggplot(subset(saa,qname%in%nms[c(1,7,10,12)]))+
+  geom_line(aes(age,data,group=X1,col=as.numeric(X1)))+
+  theme(legend.position="none")+facet_wrap(~qname)
+
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Selection Patterns from the 240 Multigan-CL runs.
+
+
+```{r OEM-err, eval=!FALSE}
+library(diags)
+
+source('~/Desktop/flr/diags/R/FLdiags/diags-MFCL.R')
+
+dgs=mdply(mfcl, function(x) diagsMfcl(getOMFiles(x)[1]))
+
+save(dgs,file=file.path(dirDat,"dgs.RData"),compress="xz")
+```
+
+
+```{r OEM-devs-1, fig.height=10, eval=!FALSE}
+dgs=transform(dgs,fleet=nms[name])
+
+dgs=subset(transform(dgs,name=nms[as.numeric(name)]),fleet%in%nms[c(1,7,10,12)])
+
+ggplot(dgs)+
+  geom_boxplot(aes(factor(year),residual))+
+  theme(legend.position="none")+facet_wrap(~name,scale="free")
+```
+**Figure `r iFig=iFig+1; iFig`.** CPUE residuals by year from the 240 Multigan-CL runs.
+
+
+```{r OEM-devs-2, fig.height=8,eval=FALSE}
+dat=subset(transform(dgs,name=nms[as.numeric(name)]),name%in%nms[c(1,7,10,12)])
+
+ggplot(ddply(dat,.(X1,name),with,quantile(residual,probs=c(0.05,0.25,0.5,0.75,0.95))))+
+  geom_line(  aes(as.numeric(X1),`50%`))+
+  geom_ribbon(aes(as.numeric(X1),ymin=`25%`,ymax=`75%`),alpha=0.5,fill="red")+
+  geom_ribbon(aes(as.numeric(X1),ymin=`5%`, ymax=`95%`),alpha=0.25,fill="red")+
+  facet_wrap(~name,ncol=2)+
+  theme(legend.position="none")+
+  xlab("Multifan-CL Run")+ylab("Quantiles")
+#**Figure `r iFig=iFig+1; iFig`.** CPUE residuals by scenario from the 240 Multigan-CL runs.
+```
+
+
+```{r OEM-devs-3, fig.height=8,eval=FALSE}
+ggplot(dat)+
+  geom_point(aes(residual,residualLag),size=.25)+
+  theme(legend.position="none")+facet_wrap(~name,scale="free")
+#**Figure `r iFig=iFig+1; iFig`.** CPUE residuals by scenario from the 240 Multigan-CL runs.
+```
+
+```{r OEM-devs-4, fig.height=8,eval=FALSE}
+ggplot(dat)+
+  geom_point(aes(qqx,qqy),size=.25)+
+  theme(legend.position="none")+facet_wrap(~name,scale="free")
+#**Figure `r iFig=iFig+1; iFig`.** CPUE residuals by scenario from the 240 Multigan-CL runs.
+```
+
+
+```{r OEM-devs-5, fig.height=8,eval=FALSE}
+ ggplot(ddply(subset(dat,X1==193),.(name,X1,year),with,mean(obs)))+
+   geom_point(aes(year,V1),size=.25)+
+   theme(legend.position="none")+facet_wrap(~name,scale="free")
+#**Figure `r iFig=iFig+1; iFig`.** CPUE residuals by scenario from the 240 Multigan-CL runs.
+```
+
+
+```{r OEM-cpue0}
+library(mpb)
+
+#source('~/Desktop/flr/mse/R/oem.R')
+
+saa=subset(saa,qname%in%nms[c(1,7,10,12)])
+
+yrs=list(ac(1990:2011),
+         ac(1990:2011),
+         ac(1990:2011),
+         ac(1990:2011))
+names(yrs)=nms[c(1,7,10,12)]
+
+u=llply(seq(length(oms)),function(x) {
+  
+             sel=subset(saa,X1==x)
+             om =oms[[x]]
+             
+             res=FLQuants(mlply(nms[c(1,7,10,12)],function(y){
+                    apply(oem(om[,yrs[[y]]],setPlusGroup(as.FLQuant(subset(sel,qname==y)[,c("age","data")]),40),
+                        timing=0.5,fish.dependent=TRUE,effort="f",mass=TRUE),c(2,6),sum)
+                        }))
+             names(res)=nms[c(1,7,10,12)]
+             res})
+
+save(u,file=file.path(dirDat,"u.RData"),compress="xz")
+names(u)=seq(length(u))
+
+ggplot(mdply(seq(length(u)),function(x) as.data.frame(u[[x]])))+
+  geom_line(aes(year,data,group=X1,col=as.numeric(X1)))+
+  facet_wrap(~qname)+
+  theme_bw()+theme(legend.position="none")+
+  xlab("Year")+ylab("CPUE")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** CPUE series by OM scenario.
+
+# Biomass Dynamic CPUE diagnostics
+
+```{r OEM-cpue}
+load(file.path(dirDat,"TFGO.RData"))
+dgs=diags(bds2[[1]])
+
+ggplot(subset(dgs,!is.na(obs)))+
+  geom_line(aes(year,obs,group=name))+
+  facet_grid(name~.,scale="free")
+
+```
+
+**Figure `r iFig=iFig+1; iFig`.** CPUE series used in biomass dynamic assessment model.
+
+
+```{r biodyn-rsdl}
+bd=bds2[[1]]
+dgs=transform(bd@diags,fleet=name)
+
+ggplot(subset(dgs,!is.na(residual)))+
+  geom_abline(aes(slope=0,intercept=0))+
+  geom_point(aes(year,residual),shape=21)+
+  geom_smooth(aes(year,residual),se=FALSE,span=1)+
+  facet_grid(.~fleet,scale="free",space="free")+
+  xlab("Year")+ylab("Residuals")+
+  theme_bw()+theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`.**  Residuals from fit to CPUE by biomass dynamic assessment model. 
+
+
+```{r biodyn-ar, fig.height=6,fig.width=8}
+ggplot(aes(residual,residualLag), data=dgs)+
+  geom_point()+
+  geom_smooth(method="lm")+
+  geom_abline(aes(slope=0,intercept=0))+
+  facet_wrap(~fleet,scale="free")+
+  xlab(expression(Residual[t]))+ylab(expression(Residual[t]))+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Autocorrelation of residuals (lag 1) from fit to CPUE by biomass dynamic assessment model.
+
+
+```{r biodyn-acf, fig.height=5}
+ggplot(ddply(subset(dgs,!is.na(residual)),.(fleet), with,
+             data.frame(lag  =0:10,
+                        value=c(acf(residual,plot=F,lag.max=10)[[1]]))))+
+  geom_abline(aes(slope=0,intercept=0))+
+  geom_linerange(aes(x=lag,ymin=0,ymax=value))+
+  facet_wrap(~fleet)+
+  xlab("Lag")+ylab("ACF")+
+  theme_bw()+theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Autocorrelation of residuals from fit to CPUE by biomass dynamic assessment model.
+
+```{r biodyn-qq, fig.height=6,fig.width=8}
+ggplot(aes(qqx,qqy), data=dgs)+
+  geom_point()+
+  geom_line(aes(qqx,qqHat))+
+  facet_wrap(~fleet,scale="free")+
+  xlab(expression(Quantile[expected]))+ylab(expression(Quantile[observed]))+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Quantile Quantile plot of residuals from fit to CPUE by biomass dynamic assessment model

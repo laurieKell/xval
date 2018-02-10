@@ -1,0 +1,260 @@
+---
+title: "North Atlantic Albacore MSE"
+subtitle: "Validation"
+author: "L Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+
+## Agreed validation steps before advice will be given
+
+*  Use the same random deviates across all scenarios, and check stability of higher and lower percentiles within and across OM/MP scenarios. i.e. run for 1000 iters for selected OM/MP combinations.
+*  To check SRR run with high F’s and the dynamics are working the way they should, i.e contrast in the Spawning stock size and what it gives on recruitment
+*  Conduct a crosstest, i.e. run OM without feedback generate catch and CPUE fit SA, every 3 years and compare the OM and stock assessment (SA)
+*  Use OEM in cross test
+*  For all OM/MP trials run simple F=Ftarget projection, to check dynamics
+*  Run OM with feedback for an F target of FMSY  and compare to F projection
+*  Run a OM with feedback for an F target of FMSY and an Btreshold of BMSY, compare to above.
+*  Run a OM with feedback for an F target of FMSY and an Btreshold of BMSY plus TAC bounds of 20, 25 and 30%, compare to above.
+*  Run scenarios using a factorial design, i.e. main effects, 1st, 2nd, ... order interactions, see if you can predict the performance indicators
+*  Compare OM and MP reference points
+*  Check TAC output by MP and Catch taken from OM, iteration by iteration.
+*  OM conditioning, of historic and future, i.e. calculate the OM production functions and compare trajectories to these. 
+*  Compare OM reference points and statistics such as K, r, … to MP values 
+*  Check SA, e.g. hitting bounds, convergence
+*  Compare TAC output from MP compared to Catch from OM
+
+
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(knitr)
+
+opts_chunk$set(cache     =TRUE, 
+               comment   =NA, 
+               warning   =FALSE, 
+               message   =FALSE, 
+               error     =FALSE, 
+               echo      =FALSE, 
+               eval      =TRUE,
+               fig.width =10, 
+               fig.height=8,
+               fig.path  ="../tex/om-")
+iFig=0
+iTab=0
+```
+
+```{r data, eval=TRUE}
+library(FLCore)
+library(plyr)
+
+dirMy  ="/home/laurence/Desktop/mse/albn"
+dirInp =file.path(dirMy,"inputs")
+dirMfcl=file.path(dirInp,"mfcl")
+dirDat =file.path(dirMy,"data")
+
+mfcl=file.path(dirMfcl,system(paste("ls",dirMfcl),intern=TRUE))
+```
+
+
+```{r funcs}
+source('~/Desktop/flr/FLCore/R/io.MFCL.R')
+
+##gets MFCL plot rep and par files to read in FLStock
+getOMFiles<-function(x){
+  f=system(paste("ls",x),intern=TRUE)
+
+  r=f[grep(".rep",f)]
+  r=sort(r[grep("plot-",r)])
+  r=r[length(r)]
+  
+  p=sort(f[grep(".par",substr(f,nchar(f)-3,nchar(f)))])
+  p=p[length(p)]
+  
+  file.path(x,c(r,p))}
+```
+
+#  OM conditioning
+
+The Operating Model (OM) is a mathematical–statistical model used to describe the actual resource dynamics in simulation trials and to generate resource monitoring data when projecting forward. The OM simulates historical and future dynamics and psuedo data for use in the Management procedure (MP).
+
+An OM is conditioned on available information by adjusting the parameter values to ensure that it is consistent with this information, and hence reflects assumptions that are plausible this process maybe, but does not have to be similar to an assessment; the conditioning provides the initial conditions for projecting resource dynamics forward.
+
+The OEM is the component of the OM that generates fishery-dependent and/or fishery-independent resource monitoring data for input to an MP.
+
+## Recruitment dynamics
+
+```{r OM-rec, eval=TRUE, echo=FALSE, warning=FALSE}
+fn1<-function(x){
+      cat(x,file="/home/laurence/Desktop/tmp/chk.txt")
+      fmle(as.FLSR(readMFCL(getOMFiles(x)),model="bevholt"),control=list(silent=TRUE))}
+
+fn2<-function(res){
+      rec=rec(res)
+      ssb=ssb(res)
+      rsd=residuals(res)
+      dimnames(rsd)$year=dimnames(ssb)$year
+      
+      df=model.frame(FLQuants(rec=rec,ssb=ssb,residual=rsd),drop=TRUE)
+      names(df)[1]="yearclass"
+      df}
+
+fn3<-function(x){
+  tmp=scan(getOMFiles(x)[1],sep="\n",what=as.character())
+  bh =tmp[grep("Bever",tmp)[1]+1]
+  bh =as.numeric(strsplit(bh," ")[[1]])
+  bh[!is.na(bh)]}
+ 
+sr1=mlply(mfcl[  1: 40],fn1);save(sr1,file=file.path(dirDat,"sr1.RData"),compress="xz")
+sr2=mlply(mfcl[ 41: 80],fn1);save(sr2,file=file.path(dirDat,"sr2.RData"),compress="xz")
+sr3=mlply(mfcl[ 81:120],fn1);save(sr3,file=file.path(dirDat,"sr3.RData"),compress="xz")
+sr4=mlply(mfcl[121:160],fn1);save(sr4,file=file.path(dirDat,"sr4.RData"),compress="xz")
+sr5=mlply(mfcl[161:200],fn1);save(sr5,file=file.path(dirDat,"sr5.RData"),compress="xz")
+sr6=mlply(mfcl[201:240],fn1);save(sr6,file=file.path(dirDat,"sr6.RData"),compress="xz")
+   
+srr=FLSRs(sr1)
+srr[ 41: 80]=FLSRs(sr2)
+srr[ 81:120]=FLSRs(sr3)
+srr[121:160]=FLSRs(sr4)
+srr[161:200]=FLSRs(sr5)
+srr[201:240]=FLSRs(sr6)
+rm(sr1,sr2,sr3,sr4,sr5,sr6)
+
+save(srr,file=file.path(dirDat,"srr.RData"),compress="xz")
+   
+df  =ldply(srr[1:240],fn2)
+par =laply(srr[1:240],params)
+par =FLPar(t(par))
+
+cov=laply(srr[1:240],vcov)
+vcv=as(aperm(cov,c(2,3,1)),"FLPar")
+names(vcv)=c("params","params","iter")
+dimnames(vcv)[[3]]=seq(240)
+
+bh =ldply(mfcl, fn3)
+names(bh)=c("a","b","s")
+bf=as(bh,"FLPar")
+
+save(df,par,vcv,bh,srr,file=file.path(dirDat,"srr.RData"))
+```
+
+Base run configuration and base tests to assess it is doing what we think it should, i.e. the steepness formulation should not be driven by the prior for recruitment dynamics. 
+
+## Biological parameters
+
+```{r OM-pg40}
+library(FLife)
+
+stks=FLStocks(mlply(mfcl, function(x)
+    readMFCL(getOMFiles(x))))
+
+rng=ldply(stks,range)
+
+save(stks,rng,file=file.path(dirDat,"om.RData"),compress="xz")
+
+load(file.path(dirDat,"om.RData"))
+
+data(teleost)
+par=iter(teleost,"Thunnus alalunga")
+par[c("a","b")]=c("a"=1.34e-5,"b"=3.1066)	
+
+fn4<-function(stk,par){
+  
+  fn<-function(x,a,b,waa,fit=TRUE){
+        par=FLPar(x)
+        hat=len2wt(vonB(ages(waa),par),FLPar("a"=a,"b"=b))
+        if (!fit) return(hat)
+        sum((waa-hat)^2)}
+  
+  x=c(t0=par["t0"],linf=par["linf"],k=par["k"])
+
+  vb=optim(x,fn,a=par["a"],b=par["b"],waa=stock.wt(stk)[-dim(stk)[1]])$par
+  
+  sr=fmle(as.FLSR(stk,model="geomean"),control=list(silent=TRUE))
+  res=setPlusGroup(stk,40)
+  res=fwd(res,catch=catch(res)[,-1],sr=sr,sr.residuals=exp(residuals(sr)))
+
+  stock.wt(res)   =fn(vb,a=par["a"],b=par["b"],stock.wt(res),fit=FALSE)
+  catch.wt(res)   =stock.wt(res)
+  landings.wt(res)=stock.wt(res)
+  discards.wt(res)=stock.wt(res)
+  
+  stock(res)=computeStock(res)
+  catch(res)=computeCatch(res)
+  
+  res}
+
+om1=FLStocks(llply(stks[  1: 40],fn4,par=par))
+om2=FLStocks(llply(stks[ 41: 80],fn4,par=par))
+om3=FLStocks(llply(stks[ 81:120],fn4,par=par))
+om4=FLStocks(llply(stks[121:160],fn4,par=par))
+om5=FLStocks(llply(stks[161:200],fn4,par=par))
+om6=FLStocks(llply(stks[201:240],fn4,par=par))
+
+oms=FLStocks(om1)
+oms[ 41: 80]=om2
+oms[ 81:120]=om3
+oms[121:160]=om4
+oms[161:200]=om5
+oms[201:240]=om6
+
+names(oms)=names(stks)
+
+save(stks,oms,rng,file=file.path(dirDat,"om.RData"),compress="xz")
+```
+
+```{r OM-brp}
+eqls=FLBRPs(mlply(seq(length(oms)), function(x,om=oms,sr=srr) brp(FLBRP(om[[x]],sr=sr[[x]]))))
+
+save(eqls,file=file.path(dirDat,"eqls.RData"),compress="xz")
+```
+
+# OEM
+
+How is the OE component being implemented.
+
+```{r OEM}}
+library(FLMethLen)
+library(reshape)
+
+nms=c("Spain BB","Spain France\nTroll","Spain France\nEarly BB",
+      "Portugal\nBB","Japan\nLL Target","Japan\nLL tra","Japan\nLL Bycatch",
+      "Chinese-Taipei\nLL Early","Chinese-Taipei\nLL Mid","Chinese-Taipei\nLL Late",
+      "KoreaPaCu LL","Other surface")
+
+fn6<-function(x){
+   print(x)
+   
+   caa=mdply(1:12, function(fleet)
+       alkMFCL(file.path(x,"length.fit"),
+               file.path(x,"albN.frq"),fleet)$caa)
+    caa=transform(caa,year=as.numeric(ac(year)),
+                      age =as.numeric(ac(age)))
+    caa=ddply(caa,.(year,age,X1), with, data.frame(data=sum(data)))
+    caa=ddply(caa,.(year,age),    transform, data=data/sum(data,na.rm=TRUE))
+    pca=FLQuants(dlply(caa,.(X1), with, as.FLQuant(data.frame("age"=age,"year"=year,"data"=data))))
+    pca=FLQuants(llply(pca, function(x) x[seq(dim(x)[1])]))
+    saa=FLQuants(llply(pca,function(x) apply(x,1,mean,na.rm=T)))
+    names(saa)=nms
+    
+    as.data.frame(saa,drop=TRUE)}
+
+saa=mdply(mfcl,fn6)
+
+save(saa,file=file.path(dirDat,"saa.RData"),compress="xz")
+```
+
+
+
+```{r OEM-err}}
+library(diags)
+
+dgs=mdply(mfcl, function(x) diagsMfcl(getOMFiles(x)[1]))
+
+save(dgs,file=file.path(dirDat,"dgs.RData"),compress="xz")
+
+dgs=transform(dgs,fleet=nms[name])
+ggplot(dgs)+
+  geom_boxplot(aes(factor(year),residual))+
+  facet_wrap(~fleet,scale="free_y")
+```

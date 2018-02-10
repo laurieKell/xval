@@ -1,0 +1,588 @@
+---
+title: "ALB OEM"
+author: "L Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+
+Fig 1 onwards are the MFCL residuals and fig 6 onwards the WG biodyn residuals, These are similar enough to keep us happy.
+
+Fig 9 onwards is the OEM. There are two important things, the selection patterns of the fleets, i.e. is the index a juvenile or an adult index, we had a lot of, uninformed, discussion about this, and the bias in the CT index. So I did two things simulated time series based on the partial catches, see fig 9 and 11. The time series in 11 use the same random numbers but are different due to the selection pattern. In fig 12 I added a 3% trend in q for the CT fleet and we get the bias seen in the assessment. The rest of the diagnostics are similar enough to those in the biodyn WG assessment, so looks like we have an OEM
+
+  
+```{r knitr, echo=FALSE}
+library(knitr)
+
+opts_chunk$set(comment=NA, 
+               fig.width =8, 
+               fig.height=5,
+               fig.path  ="../tex/oem-",
+               warning=FALSE, 
+               message=FALSE, 
+               error  =FALSE, 
+               echo   =FALSE, 
+               eval   =TRUE,
+               cache  =TRUE)
+iFig=0
+```
+
+```{r init, echo=FALSE}
+library(ggplot2)
+library(reshape)
+library(dplyr)
+library(plyr)
+library(FLCore)
+library(FLBRP)
+library(ggplotFL)
+library(diags)
+library(mpb)
+
+rodFn=FLife:::rodFn
+```
+
+```{r mfcl-data}
+flt=c("ESP_BBrec","EsFr_TR","EsFr_BBear","PRT_BB",
+      "JPN_LLtrg","JPN_LLtra","JPN_LLbyc",
+      "TAI_LL1","TAI_LL2","TAI_LL3",
+      "KrPaCu_LL","Other_SU")
+
+nms=c("Spain BB","Spain France\nTroll","Spain France\nEarly BB",
+      "Portugal\nBB","Japan\nLL Target","Japan\nLL tra","Japan\nLL Bycatch",
+      "Chinese-Taipei\nLL Early","Chinese-Taipei\nLL Mid","Chinese-Taipei\nLL Late",
+      "KoreaPaCu LL","Other surface")
+
+nm2=paste("flt",1:12,sep="")
+
+u=diags:::diagsMfcl("/home/laurie/Desktop/SCRS/alb-om/inputs/Base_M03_h9_q0/plot-07.par.rep")
+
+u=transform(u,fleet=factor(name,labels=nms,levels=c("flt1","flt2", "flt3", "flt4",
+                                                    "flt5","flt6", "flt7", "flt8",
+                                                    "flt9","flt10","flt11","flt12")))
+
+u=transform(subset(u,!is.na(residual)&residual!=0&name%in%paste("flt",c(1,7,10,11),sep="")),
+                      Month=factor(month))
+```
+
+
+```{r}
+f=expand.grid(a=c(paste("Alt",1:8,sep=""),"Tag","Base"),
+              m=c("M02","M03","M04"),
+              h=c("h6","h7","h8","h9"),
+              q=c("q0","q1"),stringsAsFactors=FALSE)
+
+srr=mdply(f,function(a,m,h,q) {
+       dir=file.path("/home/laurie/Desktop/SCRS/alb-om/inputs",
+                paste(a,m,h,q,sep="_"))
+       
+       if (a!="Alt5")
+         fl=file.path(dir,c("plot-07.par.rep"))
+       else  
+         fl=file.path(dir,c("plot-08.par.rep"))
+       
+       unlist(FLCore:::getBHSR(fl)[c("alpha","beta")])})
+
+alb=FLStocks(mlply(f,function(a,m,h,q) {
+  dir=file.path("/home/laurie/Desktop/SCRS/alb-om/inputs",
+                paste(a,m,h,q,sep="_"))
+  
+  if (a!="Alt5")
+    fls=file.path(dir,c("plot-07.par.rep","07.par"))
+  else  
+    fls=file.path(dir,c("plot-08.par.rep","08.par"))
+  
+  readMFCL(fls)}))
+```
+
+```{r, fig.height=6}
+library(FLMethLen)
+
+caa=mdply(1:12, function(fleet)
+   alkMFCL("/home/laurie/Desktop/SCRS/alb-om/inputs/Alt1_M02_h6_q0/length.fit",
+           "/home/laurie/Desktop/SCRS/alb-om/inputs/Alt1_M02_h6_q0/albN.frq",fleet)$caa)
+caa=transform(caa,year=as.numeric(ac(year)),
+                  age =as.numeric(ac(age)))
+caa=ddply(caa,.(year,age,X1), with, data.frame(data=sum(data)))
+caa=ddply(caa,.(year,age),    transform, data=data/sum(data,na.rm=TRUE))
+pca=FLQuants(dlply(caa,.(X1), with, as.FLQuant(data.frame("age"=age,"year"=year,"data"=data))))
+pca=FLQuants(llply(pca, function(x) x[ac(seq(dim(x)[1]))]))
+saa=FLQuants(llply(pca,function(x) apply(x,1,mean,na.rm=T)))
+names(saa)=nms
+
+save(saa,file="/home/laurie/Desktop/SCRS/alb-om/saa.RData")
+```
+
+```{r mfcl-sel}
+dirMfcl  ="/home/laurie/Desktop/SCRS/alb-om/inputs"
+fl       =read.csv("/home/laurie/Desktop/SCRS/alb-om/inputs/fl.txt",stringsAsFactors=FALSE)
+names(fl)="om"
+
+caa=mdply(fl[1:10,],function(om) 
+     mdply(1:12, function(fleet)
+        cbind(om=om,alkMFCL(file.path(dirMfcl,om,"length.fit"),
+                            file.path(dirMfcl,om,"albN.frq"),fleet)$caa)))
+   
+caa=transform(caa,year=as.numeric(ac(year)),
+                  age =as.numeric(ac(age)))
+caa=ddply(caa,.(year,age,X1,om), with, data.frame(data=sum(data)))
+caa=ddply(caa,.(year,age,om), transform, data=data/sum(data,na.rm=TRUE))
+
+pca=ddply(caa,.(om,year), transform, data.frame(pca=data/sum(data)))
+
+names(pca)[3:5]=c("fleet","OM","Selectivity")
+```
+
+```{r mfcl-sel-om}
+ggplot(subset(pca,year==73))+
+  geom_point(aes(age,Selectivity,fill=OM),shape=21,size=1.0)+
+  facet_wrap(~fleet)+
+  theme_bw()+theme(legend.position="none")  
+```
+
+**Figure `r iFig=iFig+1; iFig`.**   Selection patterns by fleet (panel) across OMs for 1 year
+
+
+```{r mfcl-sel-year}
+ggplot(subset(pca,OM=="Alt1_M02_h6_q1"))+
+  geom_point(aes(age,Selectivity,fill=factor(year)),shape=21,size=0.5)+
+  facet_wrap(~fleet)+
+  theme_bw()+theme(legend.position="none")  
+```
+
+**Figure `r iFig=iFig+1; iFig`.**   Selection patterns by fleet (panel) across OMs for 1 year
+#Operating Model
+
+
+```{r mfcl-cpue}
+ggplot(ddply(u,.(fleet,month),transform,obs=obs/mean(obs)))+
+  geom_point(aes(year,obs,fill=Month,col=Month),shape=21)+
+  geom_smooth(aes(year,obs),se=FALSE)+
+  facet_grid(.~fleet,scale="free",space="free")+
+  xlab("Year")+ylab("CPUE")+
+  theme_bw()+theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Time series of Multifan-CL CPUE indices corresponding to those used in the working group biomass dynamic assessment assessment.
+
+```{r mfcl-dev}
+dgs=ddply(u,.(Month,fleet), with, data.frame(dev=diags:::stdz(effDev.value),year=year))
+ggplot(dgs)+
+  geom_abline(aes(slope=0,intercept=0))+
+  geom_point(aes(year,dev,fill=Month,col=Month),shape=21)+
+  geom_smooth(aes(year,dev),se=FALSE)+
+  facet_grid(.~fleet,scale="free",space="free")+
+  xlab("Year")+ylab("Residuals")+
+  theme_bw()+theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`.**  Standardised effort deviates from Multifan-CL. 
+
+
+```{r mfcl-ar, fig.height=5.5}
+dat=ddply(dgs,.(Month,fleet), with, rbind(data.frame(dev="lag0",value=dev,year=year),
+                                          data.frame(dev="lag1",value=dev,year=year+1)))
+dat=cast(dat,fleet+Month+year~dev,value="value")          
+
+ggplot(aes(lag0,lag1), data=dat)+
+  geom_point()+
+  geom_smooth(method="lm")+
+  geom_abline(aes(slope=0,intercept=0))+
+  facet_wrap(~fleet,scale="free")+
+  xlab(expression(Residual[t]))+ylab(expression(Residual[t]))+
+  theme_bw()+theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Autocorrelation (lag 1) of effort deviates from Multifan-CL.
+
+```{r mfcl-acf, fig.height=9}
+ggplot(ddply(subset(dgs,!is.na(dev)),.(fleet,Month), with,
+             data.frame(lag  =0:10,
+                        value=c(acf(dev,plot=F,lag.max=10)[[1]]))))+
+  geom_abline(aes(slope=0,intercept=0))+
+  geom_linerange(aes(x=lag,ymin=0,ymax=value))+
+  facet_grid(fleet~Month,scale="free")+
+  xlab("Lag")+ylab("ACF")+
+  theme_bw()+theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Autocorrelation of effort deviates from Multifan-CL.
+
+
+```{r mfcl-qq, fig.height=8}
+qq=ddply(u,.(Month,fleet), with, {
+       qq.          =qqnorm(c(effDev.value),plot.it=FALSE)
+       qqx          =qq.$x
+       qqy          =qq.$y
+
+       data.frame(qqx=qqx,qqy=qqy)})
+
+qql=ddply(qq,.(Month,fleet), with, diags:::qqLine(qqx,qqy)) 
+
+ggplot(aes(qqx,qqy,col=Month), data=qq)+
+  geom_point()+
+  geom_abline(aes(slope=a,intercept=b,col=Month),data=qql)+
+  facet_grid(fleet~Month,scale="free")+
+  xlab(expression(Quantile[expected]))+ylab(expression(Quantile[observed]))+
+  theme_bw()+theme(legend.position="none")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Quantile Quantile plot for effort deviates from Multifan-CL.
+
+#Biomass Dynamic
+
+```{r biodyn-cpue}
+data=read.csv("/home/laurie/ownCloud/ALBAss/ALBAss/Analysis/biodyn/indices/ALB_N_CPUE_MASTER_20160503_v2.csv")
+cpue=FLQuants(dlply(data,.(fleet), with, as.FLQuant(data.frame(year=year,data=stdcpue))))
+
+plot(cpue[-4])+
+  theme_bw()+theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Time series of CPUE indices used in biomass dynamic assessment model.
+
+```{r}
+library(mpb)
+
+load("/home/laurie/Desktop/SCRS/ownCloud-2016/ALBAss/ALBAss/Analysis/biodyn/albn2016/data/TFGO.RData")
+```
+
+
+```{r biodyn-rsdl}
+bd=bds2[[1]]
+dgs=transform(bd@diags,fleet=name)
+
+ggplot(subset(dgs,!is.na(residual)))+
+  geom_abline(aes(slope=0,intercept=0))+
+  geom_point(aes(year,residual),shape=21)+
+  geom_smooth(aes(year,residual),se=FALSE)+
+  facet_grid(.~fleet,scale="free",space="free")+
+  xlab("Year")+ylab("Residuals")+
+  theme_bw()+theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`.**  Residuals from fit to CPUE by biomass dynamic assessment model. 
+
+
+```{r biodyn-ar}
+ggplot(aes(residual,residualLag), data=dgs)+
+  geom_point()+
+  geom_smooth(method="lm")+
+  geom_abline(aes(slope=0,intercept=0))+
+  facet_wrap(~fleet,scale="free")+
+  xlab(expression(Residual[t]))+ylab(expression(Residual[t]))+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Autocorrelation of residuals (lag 1) from fit to CPUE by biomass dynamic assessment model.
+
+
+```{r biodyn-acf, fig.height=5}
+ggplot(ddply(subset(dgs,!is.na(residual)),.(fleet), with,
+             data.frame(lag  =0:10,
+                        value=c(acf(residual,plot=F,lag.max=10)[[1]]))))+
+  geom_abline(aes(slope=0,intercept=0))+
+  geom_linerange(aes(x=lag,ymin=0,ymax=value))+
+  facet_wrap(~fleet)+
+  xlab("Lag")+ylab("ACF")+
+  theme_bw()+theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Autocorrelation of residuals from fit to CPUE by biomass dynamic assessment model.
+
+```{r biodyn-qq}
+ggplot(aes(qqx,qqy), data=dgs)+
+  geom_point()+
+  geom_line(aes(qqx,qqHat))+
+  facet_wrap(~fleet,scale="free")+
+  xlab(expression(Quantile[expected]))+ylab(expression(Quantile[observed]))+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Quantile Quantile plot of residuals from fit to CPUE by biomass dynamic assessment model
+
+#Observation Error Model
+
+```{r sel}
+ggplot(ldply(saa[c(1,7,9,10,12)],as.data.frame,drop=T))+
+  geom_line(aes(age,data,col=.id))+
+  xlab("Age")+ylab("Selection Pattern")+
+  theme_bw()+
+  theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Selection pattern by fleet.
+
+
+```{r sel2}
+ggplot(apply(harvest(alb[[1]])[,ac(2000:2010)],1,mean))+
+  theme_bw()+
+  geom_line(aes(age,data))
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Overall selection pattern.
+
+
+```{r cpue-sim}
+
+u=FLQuants(llply(saa[c(1,7,9,10,12)], function(x) {
+  set.seed(12345)
+  mpb:::oem(alb[[1]],fish.dependent=TRUE,sel=FLQuant(c(x),dimnames=dimnames(stock.n(alb[[1]]))))}))
+
+ggplot(ldply(u, function(x) as.data.frame(x)),aes(year,data,col=.id,fill=.id))+
+  geom_line()+
+  geom_point(shape=21,col="grey50")+
+  theme_bw()+theme(legend.position="bottom")+
+  xlab("Year")+ylab("CPUE")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Simulated indices with same seed but selection patterns of fleets.
+
+```{r mp,fig.height=10}
+#production=mpb:::production
+q0=FLQuant(cumprod(1+rep(0.00,81)),dimnames=list(year=1930:2010))
+q3=FLQuant(cumprod(1+rep(0.03,81)),dimnames=list(year=1930:2010))
+u0=FLQuants(llply(saa[c(1,7,9,10,12)], function(x){
+  set.seed(12345)
+  mpb:::oem(alb[[1]],fish.dependent=TRUE,
+            sel=FLQuant(c(x),dimnames=dimnames(stock.n(alb[[1]]))))[,ac(1975:2010)]%*%
+                q0[,ac(1975:2010)]}))
+u3=FLQuants(llply(saa[c(1,7,9,10,12)], function(x) {
+  set.seed(123345)
+  mpb:::oem(alb[[1]],fish.dependent=TRUE,
+            sel=FLQuant(c(x),dimnames=dimnames(stock.n(alb[[1]]))))[,ac(1975:2010)]%*%
+                q3[,ac(1975:2010)]}))
+
+
+u=u0
+u[[1]]=u3[[1]]
+mp=bds2[[1]]
+# setParams(mp)=u
+# setControl(mp)=params(mp)
+# mp=fit(mp,u)
+#plot(mp)
+dgs=mp@diags
+
+ggplot(subset(dgs,!is.na(residual)))+
+  geom_abline(aes(slope=0,intercept=0))+
+  geom_point(aes(year,residual),shape=21)+
+  geom_smooth(aes(year,residual),se=FALSE)+
+  facet_grid(name~.,scale="free",space="free")+
+  xlab("Year")+ylab("Residuals")+
+  theme_bw()+theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`.**  Residuals from fit to simulated CPUE series. 
+
+
+```{r}
+ggplot(aes(residual,residualLag), data=dgs)+
+  geom_point()+
+  geom_smooth(method="lm",se=FALSE)+
+  geom_abline(aes(slope=0,intercept=0))+
+  facet_wrap(~name,scale="free")+
+  xlab(expression(Residual[t]))+ylab(expression(Residual[t]))+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Autocorrelation of residuals from fit to simulated CPUE series. 
+
+
+```{r}
+ggplot(aes(qqx,qqy), data=dgs)+
+  geom_point()+
+  geom_line(aes(qqx,qqHat))+
+  facet_wrap(~name,scale="free")+
+  xlab(expression(Quantile[expected]))+ylab(expression(Quantile[observed]))+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Quantile Quantile plot for residuals from fit to simulated CPUE series. 
+
+```{r}
+library(FLife)
+library(FLBRP)
+library(popbio)
+
+rodFn=FLife:::rodFn
+
+refpts=FLBRP:::refpts
+
+refs<-function(obj,s=0.9){
+  
+  ## msy
+  #eql =FLBRP(obj)
+  spr0=mean(spr0(FLBRP(obj)))
+  # srr =as.FLSR(obj,model="bevholtSV")
+  # upper(srr)[1:2]=1e12
+  # srr=fmle(srr,
+  #          fixed=list(s=s,spr0=spr0),
+  #          control=list(silent=TRUE),
+  #          method="Brent")
+  # model(eql) =bevholt()$model
+  # params(eql)=ab(params(srr),"bevholt")[c("a","b")]
+  
+  srr =as.FLSR(obj,model="bevholt")
+  srr=fmle(srr,control=list(silent=TRUE))
+  eql=brp(FLBRP(obj,sr=srr))
+  
+  par=model.frame(params(sv(srr,spr0=spr0)))
+  
+  ## F0.1
+  eql1=brp(FLBRP(obj))
+  params(eql1)[]=unlist(c(ddply(rod(rec.obs(eql1)),.(iter), function(x)
+    mean(subset(x,regime==max(as.numeric(regime)))$data))["V1"]))
+  eql1=brp(eql1)
+  
+  res =model.frame(refpts(eql )[c("msy","crash","virgin"), 1:5])
+  res1=model.frame(refpts(eql1)[c("f0.1","spr.30","virgin"),1:5])
+  names(res1)[3]="spr0"
+  
+  res=cbind(res,res1[,1:3])
+  
+  catch(obj)=propagate(computeCatch(obj),dim(stock.n(obj))[6])
+  current=as.data.frame(mcf(FLQuants(obj,"harvest"=fbar,"yield"=catch,
+                                     "rec"    =rec, "ssb"=ssb,
+                                     "biomass"=computeStock)),drop=TRUE)
+  current=subset(current,year==max(year)&!is.na(data))[,-1]
+  names(current)[2:3]=c("current","quantity")
+  
+  res=merge(res,current,by=c("quantity"))
+  
+  r  =log(aaply(leslie(eql, f=c(refpts(eql)["crash","harvest"])),3,
+                function(x) lambda(x[drop=T])))
+  rc  =log(aaply(leslie(eql, f=c(refpts(eql)["msy","harvest"])),3,
+                 function(x)   lambda(x[drop=T])))
+  r. =data.frame(r=r, rc=rc, rc.1=NA, iter=seq(dim(stock.n(obj))[6]))
+  
+  res=cbind(merge(res,r.,by="iter"),par)
+  res}
+
+smry=mdply(seq(240), function(scen) {
+      refs(alb[[scen]],as.numeric(substr(f[scen,"h"],2,2))/10)
+      })
+
+smry=cbind(smry,f[smry$X1,])
+process<-function(dat){
+  ssb=transmute(subset(dat,quantity=="ssb"),
+                steepness=h,
+                scen     =X1,
+                rcry  =log(msy/current),
+                bmsy  =current/msy,
+                virgin=current/virgin,   
+                f0.1  =current/f0.1,     
+                spr.30=current/spr.30,
+                spr0  =current/spr0,
+                k     =v)
+  
+  f =transmute(subset(dat,quantity=="harvest"),
+               msy   =current/msy,
+               crash =current/crash,  
+               f0.1  =current/f0.1,     
+               spr.30=current/spr.30,
+               r     =r,
+               rc    =rc,
+               s     =s)
+  
+  res=data.frame(scen=dat$X1,ssb[,1:2],ssb=ssb[,-(1:2)],f=f,msy=subset(dat,quantity=="harvest")$msy)
+  res=transform(res,rcry=ssb.rcry/f.rc)
+  res}
+
+smryAlb=process(smry)
+smryAlb=cbind(smryAlb,f[smryAlb$scen,])
+```
+
+
+```{r}
+ggplot(smryAlb)+
+  geom_density(aes(f.s,group=scen,fill=scen))+
+  theme_bw()+
+  theme(legend.position="none")
+```
+
+**Figure `r iFig=iFig+1; iFig`.** 
+
+```{r,fig.height=8}
+ggplot(smryAlb)+
+  geom_point(aes(ssb.bmsy,f.msy,col=a))+
+  scale_x_log10()+scale_y_log10()+
+  facet_wrap(~steepness)+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`.**
+
+```{r}
+library(glmnet)
+x=transmute(smryAlb[,c(20:23)],
+            case     =factor(a),
+            steepness=factor(h),
+            m        =factor(m),
+            q        =factor(q))
+x=model.matrix(~.+m*steepness*case-1,x)
+y=log(as.matrix(smryAlb[,c("ssb.bmsy","f.r")][2]))
+
+fit=glmnet::cv.glmnet(x, y)
+plot(fit)
+
+lmb=fit$lambda.1se
+coeffs=coef(fit, s="lambda.1se")
+
+fit = glmnet(x, y)
+plot(fit, xvar = "lambda", label = TRUE)
+```
+
+**Figure `r iFig=iFig+1; iFig`.**
+
+```{r, eval=FALSE}
+data(ple4)
+
+ple4=propagate(ple4,2)
+
+stock.n(iter(ple4,1))[1,]=stock.n(iter(ple4,1))[1,]*2
+srr=fmle(srr,
+         control=list(silent=TRUE),
+         method="L-BFGS-B")
+
+eql =FLBRP(ple4)
+srr =as.FLSR(ple4,model="bevholt")
+
+lower(srr)[1]=3e6
+srr=fmle(srr,
+         control=list(silent=TRUE),
+         method="L-BFGS-B")
+
+spr0=mean(spr0(FLBRP(ple4)))
+srr=fmle(srr,
+         fixed=list(spr0=spr0),
+         control=list(silent=TRUE),
+         method="L-BFGS-B")
+model(eql) =bevholt()$model
+params(eql)=ab(params(srr),"bevholt")[c("a","b")]
+eql        =brp(eql)
+```
+
+
+```{r, eval=FALSE}
+library(FLR4MFCL)
+
+alb=mfcl("/home/laurie/Desktop/SCRS/alb-om/inputs/Alt1_M02_h6_q0/albN.frq",
+         "/home/laurie/Desktop/SCRS/alb-om/inputs/Alt1_M02_h6_q0/plot-07.par.rep")
+
+read.MFCLCatch
+```
+
+```{r, eval=FALSE}
+load("/home/laurie/Desktop/MEGA/papers/scrs/2017/dataCPUEtest.RData")
+
+mp=as(window(omp1[[1]],start=1975,end=2010),"biodyn")
+params(mp)["r"]=1
+params(mp)["k"]=params(mp)["k"]*2
+
+mp=fwd(mp,catch=catch(mp))
+plot(mp)
+
+setParams(mp)=u
+setControl(mp)=params(mp)
+mp=fit(mp,u)
+
+plot(mp)
+```

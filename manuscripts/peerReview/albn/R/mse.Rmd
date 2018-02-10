@@ -1,0 +1,105 @@
+---
+title: "North Atlantic Albacore MSE"
+subtitle: "Summary of Validation Steps"
+author: "L Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+```{r, echo=FALSE, warning=FALSE}
+library(knitr)
+
+knitr::opts_chunk$set(echo = FALSE)
+
+opts_chunk$set(cache     =TRUE, 
+               cache.path="cache/validation/",
+               comment   =NA, 
+               warning   =FALSE, 
+               message   =FALSE, 
+               error     =FALSE, 
+               echo      =FALSE, 
+               eval      =TRUE,
+               fig.width =8, 
+               fig.height=8,
+               fig.path  ="../tex/validation",
+               catche.path="../cache/validation)
+iFig=0
+iTab=0
+```
+
+```{r data}
+library(FLCore)
+library(ggplotFL)
+library(FLBRP)
+library(mpb)
+library(plyr)
+
+dirMy  ="/home/laurence/Desktop/mse/albn"
+dirInp =file.path(dirMy,"inputs")
+dirMfcl=file.path(dirInp,"mfcl")
+dirDat =file.path(dirMy,"data")
+
+theme_set(theme_bw())
+```
+
+Summary based on validation trials conducted so far, i.e. on OM, OEM and MP without feedback.
+
+# MSE
+
++ The same random number seeds and hence the same deviates are now used across the trials. This means that for each OM and MP the deviates for a given quantity in the same year and iteration are the same. This is essential for checking the implementations of the OM, OEM and MP, and also means that like is being compared with like across the trials requiring less Monte Carlo simulatuions to be run.
+
++ Although Monte-Carlo diagnostics plots are provided these are based on simple F projections. Therefore these will underestimate the relationship between the statistic and sample size (n), since once the MP is included the variance will increase. MC diagnostics therefore need to be performed for selected feedback simulations to ensure stable estimates of the summary statistics 
+
+# OM
+
+Issues identified with the MSEinclude
+
++ how the recruitment dynamics, and hence reference points and dynamics, were modelled,  
++ the plusgroup dynamics were not modelled in the future
++ the vectors used in the future (e.g. selection pattern) were based on the default of 3 years, this is likely to overestimate the uncertainty due to estimation dominating process error.
++ Also although the OM was conditioned on a effort creep, i.e. an increase in catchability, only a selected effort creep scenario was run. In the 2016 WGSAM scenarios where the MP performed poorly had been removed and the WG pointed out that this was not good practice, therefore a better justification must be given for not using all 240 OM scenarios or else results must be from all 240.
+
+The performance of the HCRs tested depend on the assumed dynamics of the 
+
++ Two scenarios  SRR should be modelled i.e. recruiment deviates i) without and ii) with regime shifts.
++ The plus group has been extended to age 40 and vectors estimated from 5 years.
++ Scenarios to run, i.e. do all steepness and effort creep scenario need to be run?
+
+# OEM
+
+In the current trials for the OEM the selection patterns were not conditioned by OM scenario, only 4 CPUEs were used in the MSE while 5 were actually used in the assessment and the year ranges were incorrect.
+
++ The OEM should use the same number of CPUE for the same year ranges as in the assessment, 
++ The selection pattern should be conditioned by scenario not all the same and taken from the base case as done currently.
++ The error models should be based on the assessment diagnostics
+
+# MP
+
+The cross tests and the results from the current MSE trials show that care needs to be taken in setting up the SA control options to avoid hitting bounds and non convergence.
+
+# Next Steps
+
+Various issues were raised at the Albacore WG and WGSAM. It was therefore agreed to identify any problems with the MSE presented.
+
+Problems identified include 
+
++    The recruitment dynamics in the OM are not actually conditioned on MFCL
++    The plusgroup was set at 15, to better model older the plus plusgroup could be extended to 40
++    OEM should to be based on the actual stock assessment, i.e. same years and numbers of CPUE series
++    The selection patterns used for the CPUE series should be conditioned by scenario
++    Take last 5yrs for selection pattern and estimate selection pattern for each OM
++    The stock assessment was not set up correctly ans so there were problems with hitting bounds and non convergence
++    Random number seeds were not reused across trials, this means that the results can not be replicated or compared across trials and than more simulations need to be run.
+
+The MSE is now ready to be run to address the issues above with the aim of updating MSE for the SCRS.
+    
+    
+    
+ ```{r OM-gorka-mp-2, eval=FALSE}
+library(mpb)
+library(ggplotFL)    
+load("/media/laurence/FREECOM HDD/nalbMse/MSE_hcr_om3_hcr3_bounded20.RData")
+
+hist(model.frame(params(MSE_hcr[["mp"]])["r"])[,"r"])
+hist(model.frame(refpts(MSE_hcr[["mp"]])["bmsy"])[,"bmsy"])
+```
+**Figure `r iFig=iFig+1; iFig`** Estiamtes of r.

@@ -1,0 +1,290 @@
+---
+title: "North Atlantic Albacore MSE"
+subtitle: "Exploratory Analysis"
+author: "L Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+
+Looking at a single OM for a range of MP options, or a single MP for a range of OM scenarios it is easier to understand how the MSE are performing. It is also helpful to look at a single iteration, since this helps to check if bounds and other feedback elements are working as expected. For example **Figure 1** shows results for a single OM and MP scenario with bounds of 20, 25 and 30%, it would be expected that as a bound becomes more restrictive i.e. reduces from 30 to 20%, variability in catches would be reduced and that for a stock currentky below $B_{MSY}$ that in the short term F would be higher and SSB lower than the case with a bound of 30%. **Figure 2** shows the same scenarios for a single iteration.
+
+**Figure 3** Shows the medians by $B_{threshold}$ (row) and $F_{target}$ (lines, the red line is for an $F_{target}$ of 0.8) for a TAC bound of 30%. 
+
+
+**Figures 4** and **5** contrast the same OM for different values of steepness.  
+
+The plots, although quite simple need some explaining, e.g.
+
+*    you can not compare runs as the random numbers vary by scenario.
+*    Fig 1 is troubling, you would expect the 25% bound to be intermediate to the 20 and 30% bounds.
+*    Recruitment (and CV of OEM) could be a bigger determinant of outcome than the MP
+*    Steepness appears to have no effect
+
+## Agreed validation steps before any advice will be given
+
+*  Use the same random deviates across all scenarios, and check stability of higher and lower percentiles within and across OM/MP scenarios. i.e. run for 1000 iters for selected OM/MP combinations.
+*  To check SRR run with high F’s and the dynamics are working the way they should, i.e contrast in the Spawning stock size and what it gives on recruitment
+*  Conduct a crosstest, i.e. run OM without feedback generate catch and CPUE fit SA, every 3 years and compare the OM and stock assessment (SA)
+*  Use OEM in cross test
+*  For all OM/MP trials run simple F=Ftarget projection, to check dynamics
+*  Run OM with feedback for an F target of FMSY  and compare to F projection
+*  Run a OM with feedback for an F target of FMSY and an Btreshold of BMSY, compare to above.
+*  Run a OM with feedback for an F target of FMSY and an Btreshold of BMSY plus TAC bounds of 20, 25 and 30%, compare to above.
+*  Run scenarios using a factorial design, i.e. main effects, 1st, 2nd, ... order interactions, see if you can predict the performance indicators
+*  Compare OM and MP reference points
+*  Check TAC output by MP and Catch taken from OM, iteration by iteration.
+*  OM conditioning, of historic and future, i.e. calculate the OM production functions and compare trajectories to these. 
+*  Compare OM reference points and statistics such as K, r, … to MP values 
+*  Check SA, e.g. hitting bounds, convergence
+*  Compare TAC output from MP compared to Catch from OM
+
+
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(knitr)
+
+opts_chunk$set(cache     =TRUE, 
+               comment   =NA, 
+               warning   =FALSE, 
+               message   =FALSE, 
+               error     =FALSE, 
+               echo      =FALSE, 
+               eval      =TRUE,
+               fig.width =10, 
+               fig.height=8,
+               fig.path  ="../tex/om-")
+iFig=0
+iTab=0
+```
+
+```{r init}
+library(plyr)
+library(dplyr)
+library(stringr)
+library(reshape2)
+library(ggplot2)
+library(ggplotFL)
+library(FLCore)
+library(FLBRP)
+
+dirMy ="/home/laurie/Desktop/MEGAsync/mse/albn"
+dirTex=file.path(dirMy,"tex")
+dirDat=file.path(dirMy,"data")
+dirInp=file.path(dirMy,"inputs")
+
+load("/home/laurie/Desktop/MEGAsync/mse/albn/data/key.RData")
+
+dirMedia="/media/laurie/FREECOM HDD/nalbMse"
+```
+
+```{r funcs}
+FLQuants2FLQuant<-function(object){
+   mat=ldply(object,as.data.frame)[,-7]
+   names(mat)[1]="iter"
+   mat$iter=as.numeric(as.factor((mat$iter)))
+   
+   as.FLQuant(mat)}
+ 
+ flqs2flq<-function(object,flq){
+   nit=laply(object,function(x) dims(x)$iter)
+   nit=c(0,cumsum(nit))[seq(length(nit))]
+   
+    mat=mdply(seq(length(nit)),function(i) {
+     transform(as.data.frame(slot(object[[i]],flq)),
+               iter=as.numeric(as.character(iter))+nit[i])})[,-1]
+   
+   as.FLQuant(mat)}
+
+FLStocks2FLStock<-function(object){
+  dms=ldply(object,function(x) unlist(dims(x)))
+
+  dms$min=as.numeric(dms$min)
+  dms$max=as.numeric(dms$max)
+  dms$minyear=as.numeric(dms$minyear)
+  dms$maxyear=as.numeric(dms$maxyear)
+
+  dmns=list(age =min(dms$min):max(dms$max),
+            year=min(dms$minyear):max(dms$maxyear))
+
+  nts=length(object)
+  res=propagate(FLStock(catch.n=FLQuant(NA,dimnames=dmns)),nts)
+
+  minyear=unique(laply(object,function(x) dims(x)$minyear))
+  if (length(minyear)>1)
+    object=FLStocks(llply(object,window,start=min(minyear)))
+
+  slt=getSlots("FLStock")
+  for (s in names(slt[slt%in%"FLQuant"]))
+    slot(res,s)=flqs2flq(object,s)
+
+  units(harvest(res))=units(harvest(object[[1]]))
+
+  res}
+```
+
+
+```{r om1}
+load(file.path(dirMedia,"MSE_hcr_om1_hcr1_bounded20.RData"))
+oms=FLStocks("20"=window(MSE_hcr$om,end=2044))
+load(file.path(dirMedia,"MSE_hcr_om1_hcr1_bounded25.RData"))
+oms[["25"]]=window(MSE_hcr$om,end=2044)
+load(file.path(dirMedia,"MSE_hcr_om1_hcr1_bounded30.RData"))
+oms[["30"]]=window(MSE_hcr$om,end=2044)
+```
+
+
+```{r om1-plot}
+p=plot(oms)+
+  theme_bw()
+p$data=subset(p$data,year>2000)
+p
+```
+**Figure `r iFig=iFig+1; iFig`.** Operating Model runs for Multifan-CL scenario Alt1 with M=0.2 and steepness=0.6; HCR with Ftarget=0.6 and Bthreshold=0.6.
+
+
+```{r om1-plot2}
+plot(FLStocks(llply(oms,function(x) window(iter(x,1),start=2000))))+
+  geom_vline(aes(xintercept=2014))+
+  theme_bw()
+```
+**Figure `r iFig=iFig+1; iFig`.** Single iteration for Operating Model runs for Multifan-CL scenario Alt1 with M=0.2 and steepness=0.6; HCR with Ftarget=0.6 and Bthreshold=0.6.
+
+```{r}
+load(file.path(dirMedia,"MSE_hcr_om1_hcr1_bounded30.RData"))
+oms=FLStocks("1"=window(MSE_hcr$om,end=2044))
+load(file.path(dirMedia,"MSE_hcr_om1_hcr2_bounded30.RData"))
+oms[["2"]]=window(MSE_hcr$om,end=2044)
+load(file.path(dirMedia,"MSE_hcr_om1_hcr3_bounded30.RData"))
+oms[["3"]]=window(MSE_hcr$om,end=2044)
+load(file.path(dirMedia,"MSE_hcr_om1_hcr4_bounded30.RData"))
+oms[["4"]]=window(MSE_hcr$om,end=2044)
+load(file.path(dirMedia,"MSE_hcr_om1_hcr5_bounded30.RData"))
+oms[["5"]]=window(MSE_hcr$om,end=2044)
+load(file.path(dirMedia,"MSE_hcr_om1_hcr6_bounded30.RData"))
+oms[["6"]]=window(MSE_hcr$om,end=2044)
+load(file.path(dirMedia,"MSE_hcr_om1_hcr7_bounded30.RData"))
+oms[["7"]]=window(MSE_hcr$om,end=2044)
+load(file.path(dirMedia,"MSE_hcr_om1_hcr8_bounded30.RData"))
+oms[["8"]]=window(MSE_hcr$om,end=2044)
+load(file.path(dirMedia,"MSE_hcr_om1_hcr9_bounded30.RData"))
+oms[["9"]]=window(MSE_hcr$om,end=2044)
+load(file.path(dirMedia,"MSE_hcr_om1_hcr10_bounded30.RData"))
+oms[["10"]]=window(MSE_hcr$om,end=2044)
+load(file.path(dirMedia,"MSE_hcr_om1_hcr11_bounded30.RData"))
+oms[["11"]]=window(MSE_hcr$om,end=2044)
+load(file.path(dirMedia,"MSE_hcr_om1_hcr12_bounded30.RData"))
+oms[["12"]]=window(MSE_hcr$om,end=2044)
+load(file.path(dirMedia,"MSE_hcr_om1_hcr13_bounded30.RData"))
+oms[["13"]]=window(MSE_hcr$om,end=2044)
+load(file.path(dirMedia,"MSE_hcr_om1_hcr14_bounded30.RData"))
+oms[["14"]]=window(MSE_hcr$om,end=2044)
+load(file.path(dirMedia,"MSE_hcr_om1_hcr15_bounded30.RData"))
+oms[["15"]]=window(MSE_hcr$om,end=2044)
+
+mp=subset(key,om==1&bound==30&steepness=="h6"&m=="M02")
+p=plot(FLStocks(llply(oms,function(x) iter(window(x,start=2015),1:100))))
+
+p$data=transform(p$data,
+                  threshold=mp[stock,"btrig"],
+                  target   =mp[stock,"ftar"])
+names(p$data)[9:11]=c("10%","50%","90%")
+ggplot(p$data)+
+  #geom_ribbon(aes(year,ymax=`90%`,ymin=`10%`,fill=factor(target)),alpha=.05)+
+  geom_line(  aes(year,y=`50%`,group=factor(target)))+
+  geom_line(  aes(year,y=`50%`,group=factor(target)),data=subset(p$data,target==.8),col="red")+
+  facet_grid(qname~threshold,scale="free")+
+  theme_bw()+
+  xlab("Year")+ylab("Median")
+```
+**Figure `r iFig=iFig+1; iFig`.** Median for Operating Model runs for Multifan-CL scenario Alt1 with M=0.2 and steepness=0.6; bound=30%.
+
+```{r}
+load(file.path(dirMedia,subset(key,mp==1&mfcl=="Base"&m=="M02"&q=="q0"&bound==30)[1,"file"]))
+oms=FLStocks("h6"=MSE_hcr$om)
+load(file.path(dirMedia,subset(key,mp==1&mfcl=="Base"&m=="M02"&q=="q0"&bound==30)[2,"file"]))
+oms[["h7"]]=MSE_hcr$om
+load(file.path(dirMedia,subset(key,mp==1&mfcl=="Base"&m=="M02"&q=="q0"&bound==30)[3,"file"]))
+oms[["h8"]]=MSE_hcr$om
+load(file.path(dirMedia,subset(key,mp==1&mfcl=="Base"&m=="M02"&q=="q0"&bound==30)[4,"file"]))
+oms[["h9"]]=MSE_hcr$om
+
+plot(FLStocks(llply(oms,window,start=2015,end=2044)))+
+  theme_bw()
+```
+**Figure `r iFig=iFig+1; iFig`.**  Operating Model runs for Multifan-CL scenario Alt1 with M=0.2; bound=30% and Btrhreshold=0.6 and FTarget=0.6.
+
+```{r}
+load(file.path(dirMedia,subset(key,mp==1&mfcl=="Base"&m=="M04"&q=="q0"&bound==30)[1,"file"]))
+oms=FLStocks("h6"=MSE_hcr$om)
+load(file.path(dirMedia,subset(key,mp==1&mfcl=="Base"&m=="M04"&q=="q0"&bound==30)[2,"file"]))
+oms[["h7"]]=MSE_hcr$om
+load(file.path(dirMedia,subset(key,mp==1&mfcl=="Base"&m=="M04"&q=="q0"&bound==30)[3,"file"]))
+oms[["h8"]]=MSE_hcr$om
+load(file.path(dirMedia,subset(key,mp==1&mfcl=="Base"&m=="M04"&q=="q0"&bound==30)[4,"file"]))
+oms[["h9"]]=MSE_hcr$om
+
+plot(FLStocks(llply(oms,window,start=2015,end=2044)))+
+  theme_bw()
+```
+**Figure `r iFig=iFig+1; iFig`.**  Operating Model runs for Multifan-CL scenario Alt1 with M=0.4; bound=30% and Btrhreshold=0.6 and FTarget=0.6.
+
+```{r}
+plot(FLStocks(llply(oms,function(x) window(iter(x,1),start=2015,end=2044))))+
+  theme_bw()
+```
+**Figure `r iFig=iFig+1; iFig`.**  Operating Model runs, single iter, for Multifan-CL scenario Alt1 with M=0.2; bound=30% and Btrhreshold=0.6 and FTarget=0.6.
+
+```{r, eval=FALSE}
+
+#load("/home/laurie/Desktop/MEGAsync/mse/albn/data/alb-240.RData")
+
+dir=scan("/home/laurie/Desktop/tmp/inputs/dir.txt",what=as.character())
+  
+mfcl=mlply(dir, function(x){
+  if (length(grep("Alt5",dir[1])>0))
+  readMFCL(file.path("/home/laurie/Desktop/tmp/inputs",x,c("plot-08.par.rep","08.par")))
+  else
+  readMFCL(file.path("/home/laurie/Desktop/tmp/inputs",x,c("plot-07.par.rep","07.par")))})
+
+om=FLStocks2FLStock(mfcl)
+
+rm(mfcl)
+
+dir[c(is.na(catch(om)[,"2010"]))]
+```
+
+```{r, eval=FALSE}
+load("/home/laurie/Desktop/MEGAsync/mse/albn/data/key.RData")
+
+badOM=seq(dim(om)[6])[is.na(c(catch(om)[,"2011"]))]
+
+badKey=subset(key,om%in%badOM)
+
+plot(iter(om,badOM))
+```
+
+# MFCL Runs
+```{r om}
+#load("/home/laurie/Desktop/MEGAsync/mse/albn/data/alb-240.RData")
+
+dir=scan("/home/laurie/Desktop/tmp/inputs/dir.txt",what=as.character())
+  
+mfcl=mlply(dir, function(x){
+  if (length(grep("Alt5",dir[1])>0))
+  readMFCL(file.path("/home/laurie/Desktop/tmp/inputs",x,c("plot-08.par.rep","08.par")))
+  else
+  readMFCL(file.path("/home/laurie/Desktop/tmp/inputs",x,c("plot-07.par.rep","07.par")))})
+
+om=FLStocks2FLStock(mfcl)
+
+rm(mfcl)
+
+dir[c(is.na(catch(om)[,"2010"]))]
+```
+# Agreed Validation Steps
+
+##  Use the same random deviates across all scenarios for 100 iters
+
+
+

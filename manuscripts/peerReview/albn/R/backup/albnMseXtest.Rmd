@@ -1,0 +1,157 @@
+---
+title: "North Atlantic Albacore MSE"
+subtitle: "Cross test of the biomass dynamic assessment model"
+author: "L Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(knitr)
+
+opts_chunk$set(cache     =TRUE, 
+               comment   =NA, 
+               warning   =FALSE, 
+               message   =FALSE, 
+               error     =FALSE, 
+               echo      =FALSE, 
+               eval      =TRUE,
+               fig.width =10, 
+               fig.height=8,
+               fig.path  ="../tex/om-")
+iFig=0
+iTab=0
+```
+
+```{r init}
+library(plyr)
+library(dplyr)
+library(stringr)
+library(reshape2)
+library(ggplot2)
+library(ggplotFL)
+library(FLCore)
+library(FLBRP)
+library(mpb)
+
+dirMy ="/home/laurie/Desktop/MEGAsync/mse/albn"
+dirTex=file.path(dirMy,"tex")
+dirDat=file.path(dirMy,"data")
+dirInp=file.path(dirMy,"inputs")
+```
+
+```{r om}
+load("/home/laurie/Desktop/MEGAsync/mse/albn/data/alb-240.RData")
+
+FLQuants2FLQuant<-function(object){
+   mat=ldply(object,as.data.frame)[,-7]
+   names(mat)[1]="iter"
+   mat$iter=as.numeric(as.factor((mat$iter)))
+   
+   as.FLQuant(mat)}
+ 
+ flqs2flq<-function(object,flq){
+   nit=laply(object,function(x) dims(x)$iter)
+   nit=c(0,cumsum(nit))[seq(length(nit))]
+   
+    mat=mdply(seq(length(nit)),function(i) {
+     transform(as.data.frame(slot(object[[i]],flq)),
+               iter=as.numeric(as.character(iter))+nit[i])})[,-1]
+   
+   as.FLQuant(mat)}
+
+FLStocks2FLStock<-function(object){
+  dms=ldply(object,function(x) unlist(dims(x)))
+
+  dms$min=as.numeric(dms$min)
+  dms$max=as.numeric(dms$max)
+  dms$minyear=as.numeric(dms$minyear)
+  dms$maxyear=as.numeric(dms$maxyear)
+
+  dmns=list(age =min(dms$min):max(dms$max),
+            year=min(dms$minyear):max(dms$maxyear))
+
+  nts=length(object)
+  res=propagate(FLStock(catch.n=FLQuant(NA,dimnames=dmns)),nts)
+
+  minyear=unique(laply(object,function(x) dims(x)$minyear))
+  if (length(minyear)>1)
+    object=FLStocks(llply(object,window,start=min(minyear)))
+
+  slt=getSlots("FLStock")
+  for (s in names(slt[slt%in%"FLQuant"]))
+    slot(res,s)=flqs2flq(object,s)
+
+  units(harvest(res))=units(harvest(object[[1]]))
+
+  res}
+
+om=FLStocks2FLStock(alb)
+```
+
+
+```{r mp-oem-ctc}
+plot(catch(om))
+```
+**Figure `r iFig=iFig+1;iFig`.** Catch time series
+
+```{r mp-oem-u}
+plot(stock(om))
+```
+**Figure `r iFig=iFig+1;iFig`.** CPUE time series
+
+```{r xtest}
+u =window(catch(om)%/%fbar(om),start=1980)
+sa=biodyn(catch=catch(window(om,start=1980)),indices=u)
+control(sa)["k",-1]=control(sa)["k",-1]*.75
+control(sa)["r",-1]=c(0.01,0.3,0.5)
+control(sa)[5:6,1]=1
+
+ft=fit(sa,u)
+
+plot(ft)
+```
+**Figure `r iFig=iFig+1;iFig`.** Fits of biomass dynamic stock assessment model to OM, i.e. crosstest.
+
+
+```{r bmsy-1}
+yrs=dimnames(stock(ft))$year[-33]
+
+plot(mcf(FLQuants(SA=stock(ft)[,yrs],OM=ssb(om)[,yrs])))
+```
+**Figure `r iFig=iFig+1;iFig`.** Comparison of biomasss trends.
+
+
+```{r rmse}
+hist((apply((stock(sa)[,yrs]%/%stock(om)[,yrs])^2,6,sum)/dim(om)[6])^0.5/length(yrs),
+     xlab="RMSE",main="Comparison of OM and MP Biomass Trends")
+```
+<!-- **Figure `r iFig=iFig+1;iFig`.** RMSE -->
+
+
+```{r rmse-2,eval=FALSE}
+dat=c(apply(((stock(sa)[,-66]%/%bmsy(sa))%/%(ssb(om)%/%rpts["SBMSY"]))^2,6,sum)/dim(om)[6])^0.5)
+hist(dat,xlab="RMSE",main="Comparison of OM and MP Biomass Trends")
+```
+**Figure `r iFig=iFig+1;iFig`.** Summary of RMSE for crosstests
+
+
+```{r mmm, eval=FALSE}
+load("/home/laurie/Desktop/MEGAsync/mse/albn/data/key.RData")
+
+badOM=seq(dim(om)[6])[is.na(c(catch(om)[,"2011"]))]
+
+badKey=subset(key,om%in%badOM)
+
+key[seq(dim(om)[6])[is.na(c(catch(om)[,"2011"]))]]
+```
+
+
+```{r oem, eval=FALSE}
+cpue=FLQuants(llply(saa[c(1,7,10,11)], function(x) 
+    mpb:::oem(window(om,start=1981,end=range["start"]),
+              sel=FLQuant(c(x),dimnames=dimnames(stock.n(window(om,start=1981, end=range["start"])))))))
+```
+
