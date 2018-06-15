@@ -1,0 +1,671 @@
+---
+title: "North Atlantic Albacore MSE"
+subtitle: "Cross-test of MP"
+author: "L Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+library(knitr)
+
+knitr::opts_chunk$set(echo = FALSE)
+
+opts_chunk$set(comment   =NA, 
+               warning   =FALSE, 
+               message   =FALSE, 
+               error     =FALSE, 
+               echo      =FALSE, 
+               eval      =TRUE,
+               fig.width =10, 
+               fig.height=8,
+               fig.path  ="../tex/xtest/",
+               cache     =TRUE,
+               cache.path="../cache/xtest/")
+iFig=0
+iTab=0
+```
+
+```{r init}
+library(plyr)
+library(dplyr)
+library(stringr)
+library(reshape2)
+library(ggplot2)
+library(ggplotFL)
+library(FLCore)
+library(FLRP)
+library(mpb)
+library(FLife)
+
+dirMy ="/home/laurence/Desktop/sea++/xval/manuscripts/peerReview/albn-mse"
+dirDat=file.path(dirMy,"data")
+dirInp=file.path(dirMy,"inputs")
+```
+
+```{r om}
+load(file.path(dirDat,"om.RData"))
+
+FLQuants2FLQuant<-function(object){
+   mat=ldply(object,as.data.frame)[,-7]
+   names(mat)[1]="iter"
+   mat$iter=as.numeric(as.factor((mat$iter)))
+   
+   as.FLQuant(mat)}
+ 
+ flqs2flq<-function(object,flq){
+   nit=laply(object,function(x) dims(x)$iter)
+   nit=c(0,cumsum(nit))[seq(length(nit))]
+   
+    mat=mdply(seq(length(nit)),function(i) {
+     transform(as.data.frame(slot(object[[i]],flq)),
+               iter=as.numeric(as.character(iter))+nit[i])})[,-1]
+   
+   as.FLQuant(mat)}
+
+FLStocks2FLStock<-function(object){
+  dms=ldply(object,function(x) unlist(dims(x)))
+
+  dms$min=as.numeric(dms$min)
+  dms$max=as.numeric(dms$max)
+  dms$minyear=as.numeric(dms$minyear)
+  dms$maxyear=as.numeric(dms$maxyear)
+
+  dmns=list(age =min(dms$min):max(dms$max),
+            year=min(dms$minyear):max(dms$maxyear))
+
+  nts=length(object)
+  res=propagate(FLStock(catch.n=FLQuant(NA,dimnames=dmns)),nts)
+
+  minyear=unique(laply(object,function(x) dims(x)$minyear))
+  if (length(minyear)>1)
+    object=FLStocks(llply(object,window,start=min(minyear)))
+
+  slt=getSlots("FLStock")
+  for (s in names(slt[slt%in%"FLQuant"]))
+    slot(res,s)=flqs2flq(object,s)
+
+  units(harvest(res))=units(harvest(object[[1]]))
+
+  res}
+
+om=FLStocks2FLStock(oms)
+```
+
+```{r}
+save(om,file=file.path(dirDat,"omFLStock.RData"),compress="xz")
+```
+
+```{r om-plot}
+plot(oms)+
+  theme(legend.position="none")
+```
+**Figure `r iFig=iFig+1;iFig`.** Operating Models
+
+
+```{r xtest-80}
+library(stringr)
+#source('~/Desktop/flr/mpb/R/biodyn-fit.R')
+
+om80=window(om,start=1983)
+
+sa80=biodyn(catch=catch(om80),indices=0.5*(stock(om80)[,-dim(om80)[2]]+stock(om80)[,-1]))
+params(sa80)[c("r","k","p","b0")]=c(0.2,0.5e9,1e-9,0.75)
+setControl(sa80)=params(sa80)
+
+sa80=fit(sa80)
+```
+
+```{r}
+plot(sa80)
+```
+**Figure `r iFig=iFig+1;iFig`.** MP stock assessment fits using data from 1980 and perfect biomass index
+
+```{r xtest-60}
+om60=window(om,start=1960)
+```
+
+```{r}
+sa60=biodyn(catch=catch(om60),indices=window(0.5*(stock(om60)[,-dim(om60)[2]]+stock(om60)[,-1]),start=1980))
+params(sa60)[c("r","k","p","b0")]=c(0.15,7.5e8,1e-9,0.7)
+setControl(sa60)=params(sa60)
+```
+
+```{r}
+control(sa60)["q1",c("phase","val")]=c(-1,1)
+```
+
+```{r}
+load(file.path(dirDat,"eqls.RData"))
+library(popbio)
+
+sa60=fit(sa60)
+```
+
+```{r}
+plot(sa60)
+```
+**Figure `r iFig=iFig+1;iFig`.** MP stock assessment fits using data from 1960 and perfect biomass index
+
+
+```{r,fig.height=8,fig.width=8}
+load("/home/laurence/Desktop/mse/albn/albn-V2/data/eqls.RData")
+
+#refpts=mpb::refpts
+
+mrf =(stock(sa60)%/%refpts(sa60)["bmsy"])[,ac(dims(oms[[1]])$maxyear)]
+```
+
+```{r}
+orf =(ssb(om)%/%FLPar(array(laply(eqls,function(x)
+       x@refpts["msy","ssb"]),c(1,240))))[,ac(dims(oms[[1]])$maxyear)]
+bmsy=model.frame(FLQuants(om=orf,mp=mrf))
+```
+
+```{r}
+source('~/Desktop/flr/mpb/R/biodyn-msy.R')
+
+mrf=(harvest(sa60)%/%refpts(sa60)["fmsy"])[,ac(dims(harvest(sa60))$maxyear)]
+```
+
+```{r}
+orf=(fbar(om)%/%FLPar(array(laply(eqls,function(x) 
+  x@refpts["msy","harvest"]),c(1,240))))[,ac(dims(oms[[1]])$maxyear)]
+```
+
+```{r}
+fmsy=model.frame(FLQuants(om=orf,mp=mrf))
+
+res=cbind(year="60",rbind(cbind(quantity="F",fmsy),cbind(quantity="B",bmsy)))
+```
+
+```{r}
+mrf =(stock(sa60)%/%refpts(sa80)["bmsy"])[,ac(dims(oms[[1]])$maxyear)]
+```
+
+```{r}
+orf =(ssb(om)%/%FLPar(array(laply(eqls,function(x)
+  x@refpts["msy","ssb"]),c(1,240))))[,ac(dims(oms[[1]])$maxyear)]
+bmsy=model.frame(FLQuants(om=orf,mp=mrf))
+
+mrf=(harvest(sa80)%/%refpts(sa80)["fmsy"])[,ac(dims(harvest(sa80))$maxyear)]
+orf=(fbar(om)%/%FLPar(array(laply(eqls,function(x) x@refpts["msy","harvest"]),c(1,240))))[,ac(dims(oms[[1]])$maxyear)]
+
+fmsy=model.frame(FLQuants(om=orf,mp=mrf))
+
+res=rbind(res,cbind(year="80",rbind(cbind(quantity="F",fmsy),cbind(quantity="B",bmsy))))
+
+ggplot(res,aes(om,mp,col=year))+
+  geom_point()+
+  geom_smooth(method="lm",se=FALSE)+
+  geom_abline(aes(intercept=0,slope=1))+
+  facet_wrap(year~quantity,scale="free")
+
+print("RSS")
+daply(res, .(quantity,year), with, var(mp-om)^0.5)
+```
+**Figure `r iFig=iFig+1;iFig`.**  Comparison of current status ($B/B_{MSY}$ and $F/F_{MSY}$) for OM and MP.
+
+```{r, eval=FALSE}
+x=5
+f=subset(res,year=="80"&quantity=="F")
+f=transmute(f,
+   score=((mp/om)*x)>1)
+
+y=0.9
+b=subset(res,year=="80"&quantity=="B")
+b=transmute(b,
+   score=((mp/om)*x)>1)
+
+sum(b$score==f$score)
+```
+
+```{r}
+r=maply(seq(length(oms)), function(i)
+          log(lambda(leslie(eqls[[i]],fbar=c(computeRefpts(eqls[[i]])["crash","harvest"]))[,,drop=T])))
+
+prior=c(mean(r),cv=var(log(r))^0.5)
+```
+
+```{r}
+sa60@priors["r",c("weight","a","b")]=c(10,prior)
+sa60r=fit(sa60)
+plot(sa60r)
+```
+**Figure `r iFig=iFig+1;iFig`.** MP stock assessment fits using data from 1960 with prior for r and perfect biomass index
+
+```{r}
+sa80@priors["r",c("weight","a","b")]=c(10,prior)
+sa80r=fit(sa80)
+plot(sa80r)
+```
+**Figure `r iFig=iFig+1;iFig`.** MP stock assessment fits using data from 1980 with prior for r and perfect biomass index
+
+```{r,fig.height=8,fig.width=8}
+load("/home/laurence/Desktop/mse/albn/albn-V2/data/eqls.RData")
+
+mrf =(stock(sa60r)%/%refpts(sa60r)["bmsy"])[,ac(dims(oms[[1]])$maxyear)]
+orf =(ssb(om)%/%FLPar(array(laply(eqls,function(x) x@refpts["msy","ssb"]),c(1,240))))[,ac(dims(oms[[1]])$maxyear)]
+bmsy=model.frame(FLQuants(om=orf,mp=mrf))
+
+mrf=(harvest(sa60r)%/%refpts(sa60r)["fmsy"])[,ac(dims(harvest(sa60r))$maxyear)]
+orf=(fbar(om)%/%FLPar(array(laply(eqls,function(x) x@refpts["msy","harvest"]),c(1,240))))[,ac(dims(oms[[1]])$maxyear)]
+
+fmsy=model.frame(FLQuants(om=orf,mp=mrf))
+
+res=cbind(year="60",rbind(cbind(quantity="F",fmsy),cbind(quantity="B",bmsy)))
+
+mrf =(stock(sa60r)%/%refpts(sa80r)["bmsy"])[,ac(dims(oms[[1]])$maxyear)]
+orf =(ssb(om)%/%FLPar(array(laply(eqls,function(x) x@refpts["msy","ssb"]),c(1,240))))[,ac(dims(oms[[1]])$maxyear)]
+bmsy=model.frame(FLQuants(om=orf,mp=mrf))
+
+mrf=(harvest(sa80r)%/%refpts(sa80r)["fmsy"])[,ac(dims(harvest(sa80r))$maxyear)]
+orf=(fbar(om)%/%FLPar(array(laply(eqls,function(x) x@refpts["msy","harvest"]),c(1,240))))[,ac(dims(oms[[1]])$maxyear)]
+
+fmsy=model.frame(FLQuants(om=orf,mp=mrf))
+
+res=rbind(res,cbind(year="80",rbind(cbind(quantity="F",fmsy),cbind(quantity="B",bmsy))))
+```
+
+```{r}
+save(sa60,sa60r,sa80,sa80r,file=file.path(dirDat,"sa.RData"),compress="xz")
+```
+
+```{r}
+source('~/Desktop/flr/mpb/R/biodyn-statusErr.R')
+
+adult=window(ssb(om),           start=1960,end=2011)
+juve =window(stock(om)-ssb(om), start=1960,end=2011)
+fish =window(catch(om)/fbar(om),start=1960,end=2011)
+
+
+uSim=FLQuants(list(
+              "Adult"      =adult/mean(adult),
+              "Juvenile"   =juve/mean(juve),
+              "Exploitable"=fish/mean(fish)))
+
+
+plot(uSim)
+
+save(uSim,file=file.path(dirDat,"uSim.RData"))
+```
+**Figure `r iFig=iFig+1;iFig`.**  Indices, simulated.
+
+
+```{r}
+load("/home/laurence/Desktop/sea++/xval/manuscripts/peerReview/albn-mse/data/dgs.RData")
+
+dat=transmute(dgs,year=year,data=obs,iter=X1,name=name)
+dat=ddply(dat,.(iter,name,year), with, data.frame(data=sum(data)))
+u  =FLQuants(dlply(dat,.(name), with, as.FLQuant(data.frame(iter=iter,year=year,data=data))))
+
+u=FLQuants(llply(u,window, start=1960))
+
+plot(u)
+```
+**Figure `r iFig=iFig+1;iFig`.**  Indices, actual
+
+
+```{r}
+load("/home/laurence/Desktop/sea++/xval/manuscripts/peerReview/albn-mse/data/saa.RData")
+
+saa=ddply(saa,.(age,qname),with,data.frame(data=mean(data)))
+saa=ddply(saa,.(qname),with,data.frame(age=age,data=data/max(data)))
+
+ggplot(aes(age,data),data=subset(saa,qname%in%unique(saa$qname)[c(1,7,10,12)]))+
+  geom_point()+
+  geom_line()+
+  facet_wrap(~qname)+xlab("Selection pattern")
+```
+**Figure `r iFig=iFig+1;iFig`.**  Selection pattern.
+
+
+
+```{r}
+saa=FLQuants(dlply(subset(saa,qname%in%unique(saa$qname)[c(1,7,10,12)]), .(qname), 
+                          with, setPlusGroup(as.FLQuant(data.frame(data=data,age=age)),40)))
+
+```
+
+```{r}
+om.=window(om,start=1960,end=2011)
+uMfcl=FLQuants(llply(saa,function(x) quantSums(stock.n(om.)%*%stock.wt(om.)%*%x)))
+save(uMfcl,file="/home/laurence/Desktop/flr/issues/data/uMfcl.RData")
+units(uMfcl[[1]])="NA"
+units(uMfcl[[2]])="NA"
+units(uMfcl[[3]])="NA"
+units(uMfcl[[4]])="NA"
+
+names(uMfcl)=c("BB","Bycatch","LL","Surface")
+
+plot(uMfcl)
+save(uMfcl,file=file.path(dirDat,"uMfcl.RData"))
+```
+
+**Figure `r iFig=iFig+1;iFig`.**  Indices, CPUE
+
+
+
+```{r xtest-60adult}
+sa60adult=biodyn(catch=catch(sa60),indices=window(uSim[["Adult"]],end=2010))
+
+params(sa60adult)[c("r","k","p","b0")]=apply(params(sa60)[c("r","k","p","b0")],1,mean)
+setControl(sa60adult)=params(sa60adult)
+
+sa60adult=fit(sa60adult)
+
+plot(sa60adult)
+```
+  
+**Figure `r iFig=iFig+1;iFig`.**  Assessment for adult index using data from 1960
+
+```{r xtest-80adult}
+sa80adult=biodyn(catch=catch(sa80),indices=window(uSim[["Adult"]],start=1983,end=2010))
+
+params(sa80adult)[c("r","k","p","b0")]=apply(params(sa80)[c("r","k","p","b0")],1,mean)
+setControl(sa80adult)=params(sa80adult)
+
+sa80adult=fit(sa80adult)
+
+plot(sa80adult)
+```
+  
+**Figure `r iFig=iFig+1;iFig`.**  Assessment for adult index using data from 1980
+
+
+###
+
+
+```{r xtest-60juve}
+sa60juve=biodyn(catch=catch(sa60),indices=window(uSim[["Juvenile"]],end=2010))
+
+params(sa60juve)[c("r","k","p","b0")]=apply(params(sa60)[c("r","k","p","b0")],1,mean)
+setControl(sa60juve)=params(sa60juve)
+
+sa60juve=fit(sa60juve)
+
+plot(sa60juve)
+```
+  
+**Figure `r iFig=iFig+1;iFig`.**  Assessment for juvenile index using data from 1960
+
+```{r xtest-80juve}
+sa80juve=biodyn(catch=catch(sa80),indices=window(uSim[["Juvenile"]],start=1983,end=2010))
+
+params(sa80juve)[c("r","k","p","b0")]=apply(params(sa80)[c("r","k","p","b0")],1,mean)
+setControl(sa80juve)=params(sa80juve)
+
+sa80juve=fit(sa80juve)
+
+plot(sa80juve)
+```
+
+**Figure `r iFig=iFig+1;iFig`.**  Assessment for juvenile index using data from 1980
+
+###
+
+
+```{r xtest-60expl}
+sa60expl=biodyn(catch=catch(sa60),indices=window(uSim[["Exploitable"]],end=2010))
+```
+
+```{r}
+params(sa60expl)[c("r","k","p","b0")]=apply(params(sa60)[c("r","k","p","b0")],1,mean)
+setControl(sa60expl)=params(sa60expl)
+```
+
+```{r}
+sa60expl=fit(sa60expl)
+```
+
+```{r}
+plot(sa60expl)
+```
+  
+**Figure `r iFig=iFig+1;iFig`.**  Assessment for fisheries dependent index using data from 1960
+
+```{r xtest-80expl}
+sa80expl=biodyn(catch=catch(sa80),indices=window(uSim[["Exploitable"]],start=1983,end=2010))
+
+params(sa80expl)[c("r","k","p","b0")]=apply(params(sa80)[c("r","k","p","b0")],1,mean)
+setControl(sa80expl)=params(sa80expl)
+
+sa80expl=fit(sa80expl)
+
+plot(sa80expl)
+```
+
+**Figure `r iFig=iFig+1;iFig`.**  Assessment for fisheries dependent index using data from 1980
+
+
+```{r}
+save(sa60adult,sa60juve,sa60expl,sa80adult,sa80juve,sa80expl,file=file.path(dirDat,"saSim.RData"))
+```
+
+###
+
+```{r xtest-60Mfcl}
+sa60mfcl=biodyn(catch=catch(sa60),indices=FLQuants(llply(uMfcl,window,end=2010)))
+
+params(sa60mfcl)[c("r","k","p","b0")]=apply(params(sa60)[c("r","k","p","b0")],1,mean)
+setControl(sa60mfcl)=params(sa60mfcl)
+
+sa60mfcl=fit(sa60mfcl)
+
+plot(sa60mfcl)
+```
+  
+**Figure `r iFig=iFig+1;iFig`.**  Assessment for fisheries dependent index using data from 1960
+
+```{r xtest-80Mfcl}
+sa80mfcl=biodyn(catch=catch(sa80),indices=FLQuants(llply(uMfcl,window,start=1983,end=2010)))
+
+params(sa80mfcl)[c("r","k","p","b0")]=apply(params(sa80)[c("r","k","p","b0")],1,mean)
+setControl(sa80mfcl)=params(sa80mfcl)
+
+sa80mfcl=fit(sa80mfcl)
+
+plot(sa80mfcl)
+```
+
+**Figure `r iFig=iFig+1;iFig`.**  Assessment for fisheries dependent index using data from 1980
+
+
+```{r xtest-60Mfcl.r}
+sa60mfcl.r=sa60mfcl
+
+sa60mfcl.r@priors["r",]=sa60r@priors["r",]
+
+sa60mfcl.r=fit(sa60mfcl.r)
+
+plot(sa60mfcl.r)
+```
+  
+**Figure `r iFig=iFig+1;iFig`.**  Assessment for fisheries dependent index using data from 1960 and prior for r
+
+
+```{r xtest-80Mfcl.r}
+sa80mfcl.r=sa80mfcl
+
+sa80mfcl.r@priors["r",]=sa80r@priors["r",]
+
+sa80mfcl.r=fit(sa80mfcl.r)
+
+plot(sa80mfcl.r)
+```
+  
+**Figure `r iFig=iFig+1;iFig`.**  Assessment for fisheries dependent index using data from 1960 and prior for r
+
+```{r}
+
+save(sa60mfcl,sa80mfcl,sa60mfcl.r,sa80mfcl.r,file=file.path(dirDat,"saMfcl.RData"))
+```
+
+```{r}
+source('~/Desktop/flr/mpb/R/biodyn-statusErr.R')
+
+dirDat="/home/laurence/Desktop/sea++/xval/manuscripts/peerReview/albn-mse/data"
+
+load(file.path(dirDat,"om.RData"))
+load(file.path(dirDat,"eqls.RData"))
+load(file.path(dirDat,"saSim.RData"))
+
+FLQuants2FLQuant<-function(object){
+   mat=ldply(object,as.data.frame)[,-7]
+   names(mat)[1]="iter"
+   mat$iter=as.numeric(as.factor((mat$iter)))
+   
+   as.FLQuant(mat)}
+ 
+ flqs2flq<-function(object,flq){
+   nit=laply(object,function(x) dims(x)$iter)
+   nit=c(0,cumsum(nit))[seq(length(nit))]
+   
+    mat=mdply(seq(length(nit)),function(i) {
+     transform(as.data.frame(slot(object[[i]],flq)),
+               iter=as.numeric(as.character(iter))+nit[i])})[,-1]
+   
+   as.FLQuant(mat)}
+
+FLStocks2FLStock<-function(object){
+  dms=ldply(object,function(x) unlist(dims(x)))
+
+  dms$min=as.numeric(dms$min)
+  dms$max=as.numeric(dms$max)
+  dms$minyear=as.numeric(dms$minyear)
+  dms$maxyear=as.numeric(dms$maxyear)
+
+  dmns=list(age =min(dms$min):max(dms$max),
+            year=min(dms$minyear):max(dms$maxyear))
+
+  nts=length(object)
+  res=propagate(FLStock(catch.n=FLQuant(NA,dimnames=dmns)),nts)
+
+  minyear=unique(laply(object,function(x) dims(x)$minyear))
+  if (length(minyear)>1)
+    object=FLStocks(llply(object,window,start=min(minyear)))
+
+  slt=getSlots("FLStock")
+  for (s in names(slt[slt%in%"FLQuant"]))
+    slot(res,s)=flqs2flq(object,s)
+
+  units(harvest(res))=units(harvest(object[[1]]))
+
+  res}
+
+om=FLStocks2FLStock(oms)
+
+res=aperm(laply(eqls,function(x) x@refpts),c(2:3,1))
+names(dimnames(res))[[3]]="iter"
+rfs=FLPar(res)
+
+load(file.path(dirDat,"saSim.RData"))
+load(file.path(dirDat,"saMfcl.RData"))
+
+source('~/Desktop/flr/mpb/R/biodyn-statusErr.R')
+
+td=rbind(cbind(year=1960,prior="none", index="perfect", statusErrFn(om,sa60,      rfs)),
+         cbind(year=1960,prior="prior",index="perfect", statusErrFn(om,sa60r,     rfs)),
+         cbind(year=1980,prior="none", index="perfect", statusErrFn(om,sa80,      rfs)),
+         cbind(year=1980,prior="prior",index="perfect", statusErrFn(om,sa80r,     rfs)),
+         cbind(year=1960,prior="none", index="juvenile",statusErrFn(om,sa60juve,  rfs)),     
+         cbind(year=1960,prior="none", index="adult",   statusErrFn(om,sa60adult, rfs)),        
+         cbind(year=1960,prior="none", index="exploit", statusErrFn(om,sa60expl,  rfs)),     
+         cbind(year=1980,prior="none", index="juvenile",statusErrFn(om,sa80juve,  rfs)),     
+         cbind(year=1980,prior="none", index="adult",   statusErrFn(om,sa80adult, rfs)),     
+         cbind(year=1980,prior="none", index="exploit", statusErrFn(om,sa80expl,  rfs)),     
+         cbind(year=1960,prior="none", index="mfcl",    statusErrFn(om,sa60mfcl,  rfs)),     
+         cbind(year=1980,prior="none", index="mfcl",    statusErrFn(om,sa80mfcl,  rfs)),
+         cbind(year=1960,prior="prior",index="mfcl",    statusErrFn(om,sa60mfcl.r,rfs)),     
+         cbind(year=1980,prior="prior",index="mfcl",    statusErrFn(om,sa80mfcl.r,rfs)))
+```
+
+```{r}
+save(td,file=file.path(dirDat,"td.RData"),compress="xz")
+```
+
+```{r, td1,fig.height=6,fig.width=6}
+library(plotrix)
+
+with(subset(td,quantity=="harvest"),taylor.diagram(om,mp,col=NULL))
+
+d_ply(subset(td,quantity=="harvest"),.(quantity,year,index), with,taylor.diagram(om,mp,col="blue",add=TRUE))
+d_ply(subset(td,quantity=="stock"  ),.(quantity,year,index), with,taylor.diagram(om,mp,col="red", add=TRUE))
+
+#d_ply(subset(td,quantity=="harvest"&year=="1960"),.(index),with,taylor.diagram(om,mp,col="green",add=TRUE))
+```
+
+**Figure `r iFig=iFig+1;iFig`.**  Relationship between stock status havest rate (blue) and stock (red)
+
+**Table `r iTab=iTab+1;iTab`.** 
+
+```{r}
+source('~/Desktop/flr/diags/R/pErr.R')
+options(digits=3)
+ddply(td,.(quantity,index,year,prior),with,data.frame(
+    r   =cor(om,mp),
+    rmse=rmse(om-mean(om),mp-mean(mp)),
+    sd.r=var(om)^0.5,
+    sd.m=var(mp)^0.5,
+    sd  =(var(mp)^0.5)/(var(om)^0.5)))
+```
+
+
+```{r}
+library(FLCore)
+library(FLRP)
+library(ggplotFL)
+library(FLife)
+library(mpb)
+
+load("/home/laurence/Desktop/sea++/xval/manuscripts/peerReview/albn-mse/data/omFLStock.RData")
+load("/home/laurence/Desktop/sea++/xval/manuscripts/peerReview/albn-mse/data/sa.RData")
+load("/home/laurence/Desktop/sea++/xval/manuscripts/peerReview/albn-mse/data/saa.RData")
+```
+
+```{r, fig.height=10,fig.width=6}
+library(kobe)
+library(reshape)
+
+
+om=as.data.frame(FLQuants(
+          b=ssb( om)[,ac(1960:2011)]%/%FLPar(array(laply(eqls,function(x) refpts(x)["msy","ssb"]),c(1,240))),
+          f=fbar(om)[,ac(1960:2011)]%/%FLPar(array(laply(eqls,function(x) refpts(x)["msy","harvest"]),c(1,240)))),drop=TRUE)
+
+bbmsy=function(x) stock(  x)%/%refpts(x)["bmsy"]
+ffmsy=function(x) harvest(x)%/%refpts(x)["fmsy"]
+
+mp=rbind(cbind(mp="sa60mfcl",  as.data.frame(mcf(FLQuants(sa60, f=ffmsy,b=bbmsy)),drop=TRUE)),
+         cbind(mp="sa80mfcl",  as.data.frame(mcf(FLQuants(sa80, f=ffmsy,b=bbmsy)),drop=TRUE)),
+         cbind(mp="sa60mfcl.r",as.data.frame(mcf(FLQuants(sa60r,f=ffmsy,b=bbmsy)),drop=TRUE)),
+         cbind(mp="sa80mfcl.r",as.data.frame(mcf(FLQuants(sa80r,f=ffmsy,b=bbmsy)),drop=TRUE)))
+dat=merge(om,mp,by=c("year","iter","qname"))
+
+ggplot(subset(dat,year>=2008),aes(data.x,data.y))+
+  geom_point(shape=21,size=1,fill="cyan")+
+  geom_smooth(se=FALSE,span=1)+
+  facet_grid(mp~qname,scale="free_x")
+```
+
+**Figure `r iFig=iFig+1;iFig`.**  Comparison of current status ($B/B_{MSY}$ and $F/F_{MSY}$) for OM and MP.
+
+```{r, fig.height=8,fig.width=8}
+dat=cast(mp,year+iter+mp~qname,value="data")
+dt2=cast(om,year+iter~qname,value="data")
+
+    
+kobePhase()+
+  geom_point(aes(b,f),data=subset(dt2,year==2010),fill="grey",shape=21)+
+  geom_point(aes(b,f),data=subset(dat,year==2010))+
+  facet_wrap(~mp)
+```
+
+**Figure `r iFig=iFig+1;iFig`.**  Kobe
+
+**Table `r iTab=iTab+1;iTab`.** ratio between MP and MP values of $B/B_{MSY}$ and $F/F_{MSY}$
+```{r}
+ddply(subset(dat,year==2010),.(mp),with, data.frame(f=mean(f),b=mean(b)))
+
+with(subset(dt2,year==2010), data.frame(f=mean(f),b=mean(b)))
+```
+
