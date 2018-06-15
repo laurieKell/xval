@@ -3,7 +3,7 @@ title: "Conditioning the North Atlantic Albacore Operating Model on Multifan-CL"
 subtitle: "Validation"
 author: "L Kell"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: pdf_document
+output: html_document
 ---
 
 <!-- ## Agreed validation steps before advice will be given -->
@@ -29,8 +29,8 @@ library(knitr)
 
 knitr::opts_chunk$set(echo = FALSE)
 
-opts_chunk$set(cache     =TRUE, 
-               cache.pathe="cache/conditioning",
+opts_chunk$set(cache     =TRUE,
+               cache.path="../cache/conditioning/", 
                comment   =NA, 
                warning   =FALSE, 
                message   =FALSE, 
@@ -39,17 +39,32 @@ opts_chunk$set(cache     =TRUE,
                eval      =TRUE,
                fig.width =8, 
                fig.height=4,
-               fig.path  ="../tex/conditioning",
-               cache.path="../cache/conditioning")
+               fig.path  ="../tex/conditioning/")
 iFig=0
 iTab=0
 ```
 
-```{r data}
-library(FLCore)
+```{r pkgs}
+library(ggplot2)
 library(plyr)
+library(dplyr)
 
-dirMy  ="/home/laurence/Desktop/mse/albn"
+library(reshape)
+library(FLCore)
+library(ggplotFL)
+library(FLRP)
+
+library(FLash)
+```
+
+```{r}
+library(FLife)
+#library(FLMethLen)
+#library(diags)
+#library(mpb)
+
+
+dirMy  ="/home/laurence/Desktop/sea++/xval/manuscripts/peerReview/albn-mse"
 dirInp =file.path(dirMy,"inputs")
 dirMfcl=file.path(dirInp,"mfcl")
 dirDat =file.path(dirMy,"data")
@@ -141,9 +156,7 @@ A main concern expressed by stakeholders was that the CPUE time series simulated
 
 **Figures 17** onwards show the diagnostics from the 2016 biomass dynamic assessment, which should be used to parameterise the OEM. 
 
-```{r OM-pg40, eval=!FALSE}
-library(FLife)
-
+```{r OM-pg40, eval=FALSE}
 stks=FLStocks(mlply(mfcl, function(x)
     readMFCL(getOMFiles(x))))
 
@@ -227,11 +240,23 @@ save(df,par,vcv,bh,srr,file=file.path(dirDat,"srr.RData"))
 ```
 
 ```{r OM-brp}
+library(FLRP)
+
+setGeneric('refpts<-', function(object,value,...)
+		standardGeneric('refpts<-'))
+
+setMethod("refpts<-", signature(object="FLBRP", value="FLPar"),
+  function(object, value) object@refpts=value)
+
+setGeneric('refpts', function(object, ...)
+		standardGeneric('refpts'))
+
+setMethod("refpts", signature(object="FLBRP"),
+  function(object) object@refpts)
+
 load(file.path(dirDat,"oms.RData"))
 
-library(FLBRP)
-
-eqls=FLBRPs(mlply(seq(length(oms)), function(x,om=oms,sr=srr) brp(FLBRP(om[[x]],sr=sr[[x]],nyears=5))))
+eqls=as(mlply(seq(length(oms)), function(x,om=oms,sr=srr) brp(FLBRP(om[[x]],sr=sr[[x]],nyears=5))),"FLBRPs")
 
 save(eqls,file=file.path(dirDat,"eqls.RData"),compress="xz")
 ```
@@ -239,14 +264,28 @@ save(eqls,file=file.path(dirDat,"eqls.RData"),compress="xz")
 ```{r OM-2007}
 dat=merge(cbind(base=as.numeric(dimnames(subset(omKey,Run=="Base"))[[1]]),subset(omKey,Run=="Base"))[,-2],
           cbind(hcst=as.numeric(dimnames(subset(omKey,Run=="Alt6"))[[1]]),subset(omKey,Run=="Alt6"))[,-2])
+save(dat,file="/home/laurence/Desktop/tmp/dat.RData")
+```
+
+```{r OM-2007-2}
+#source('~/Desktop/flr/FLBRP/R/fwd-setup.R')
+
+#load(file.path(dirDat,"oms.RData"))
+#load(file.path(dirDat,"srr.RData"))
+#load(file.path(dirDat,"eqls.RData"))
+#load("/home/laurence/Desktop/tmp/dat.RData")
 
 hcst=FLStocks(mlply(dat[,c("base","hcst")], function(base,hcst) {
         x=fwdWindow(oms[[hcst]],end=2011,eqls[[hcst]])
         x=fwd(x,catch=catch(oms[[base]])[,ac(2008:2011)],sr=eqls[[hcst]],sr.deviates=residuals(srr[[base]]))
         x}))
+```
 
+```{r OM-2007-3}
 oms[dat$hcst]=hcst
+```
 
+```{r OM-2007-4}
 save(stks,rng,oms,file=file.path(dirDat,"om.RData"),compress="xz")
 ```
 
@@ -254,7 +293,7 @@ save(stks,rng,oms,file=file.path(dirDat,"om.RData"),compress="xz")
 
 ```{r OM-m}
 ggplot(ldply(eqls,function(x) as.data.frame(m(x)[1:10],drop=T)))+
-  geom_line(aes(age,data,group=X1))+
+  geom_line(aes(age,data,group=.id))+
   theme_bw()+xlab("Age")+ylab("Natural Mortality")
 ```
 
@@ -263,7 +302,7 @@ ggplot(ldply(eqls,function(x) as.data.frame(m(x)[1:10],drop=T)))+
 
 ```{r OM-mass}
 ggplot(ldply(eqls,function(x) as.data.frame(stock.wt(x)[1:20],drop=T)))+
-  geom_line(aes(age,data,group=X1))+
+  geom_line(aes(age,data,group=.id))+
   theme_bw()+xlab("Age")+ylab("Mass-at-age (Kg)")
 ```
 
@@ -272,7 +311,7 @@ ggplot(ldply(eqls,function(x) as.data.frame(stock.wt(x)[1:20],drop=T)))+
 
 ```{r OM-mat}
 ggplot(ldply(eqls,function(x) as.data.frame(mat(x)[1:20],drop=T)))+
-  geom_line(aes(age,data,group=X1))+
+  geom_line(aes(age,data,group=.id))+
   theme_bw()+xlab("Age")+ylab("Proportion Mature-at-age")
 ```
 
@@ -286,10 +325,25 @@ The stock recruitment relationship and the recruitment deviates are estimated as
 Base run configuration and base tests to assess it is doing what we think it should, i.e. the steepness formulation should not be driven by the prior for recruitment dynamics. 
 
 ```{r steepness-mfcl}
+spr2v=FLCore:::spr2v
+```
+
+```{r}
 spr0=ldply(eqls,function(x) c(spr0(x)))
+```
+
+```{r}
 par=laply(srr[1:240],function(x) c(params(x)))
+```
+
+```{r}
 par=as.data.frame(cbind(par,spr0=spr0[,2]))
 names(par)=c("a","b","spr0")
+save(par,file="/home/laurence/Desktop/tmp/par.RData")
+```
+
+```{r}
+load("/home/laurence/Desktop/tmp/par.RData")
 
 s=mdply(par,function(a,b,spr0) FLife:::sv(FLPar(c(a=a,b=b)),"bevholt",spr0=spr0)$s)
 names(s)[4]="s"
@@ -322,8 +376,6 @@ ggplot(cbind(bh,omKey))+
 
 
 ```{r OM-srr1, fig.height=6, fig.width=6}
-library(ggplot2)
-
 ggplot(aes(ssb,rec),data=df)+
   geom_point(shape=21,fill="blue",col="grey",size=0.75)+
   geom_smooth(se=FALSE,method="loess")+
@@ -357,8 +409,11 @@ ggplot(ddply(df,.(X1), with, data.frame(r1=residual[-length(residual)],r=residua
 
 ```{r OM-srr4}
 load(file.path(dirDat,"srr.RData"))
+rodFn=FLife:::rodFn
+
 
 star=ddply(df,.(X1), with, FLife:::rod(as.FLQuant(data.frame(data=residual,year=yearclass))))
+save(star,file=file.path(dirDat,"star.RData"))
 
 ggplot(ddply(star,.(X1,regime,year),with, mean(data)))+
   geom_line(aes(year,V1,group=paste(regime,X1),col=as.numeric(X1)))+
@@ -387,6 +442,18 @@ regimeLn=subset(merge(rg2,ddply(rg2,.(X1), function(x) data.frame(check=max(as.n
 regimeCh=rg3$change
 ```
 
+```{r OM-srrRegime}
+shifts=ddply(star,.(X1), transmute, shift=c(data[-1],NA)-data)[,2]
+
+shifts=shifts[!is.na(shifts)]
+
+hist(shifts)
+
+save(shifts,file=file.path(dirDat,"shifts.RData"))
+```
+
+**Figure `r iFig=iFig+1; iFig`.** Distributions of regimes shifts in recruitments
+
 
 ```{r OM-srr6}
 ggplot(aes(yearclass,residual),data=rg5)+
@@ -400,8 +467,6 @@ ggplot(aes(yearclass,residual),data=rg5)+
 **Figure `r iFig=iFig+1; iFig`.** Recruitment residuals with regimes removed
 
 ```{r OM-srr7}
-library(ggplotFL)
-
 recRegime<-function(n,yrs,ln,ch){
   
   fn<-function(iter,yrs,ln,ch){  
@@ -456,7 +521,6 @@ How is the OE component being implemented.
 
 ```{r OEM, eval=!FALSE}
 library(FLMethLen)
-library(reshape)
 
 fn6<-function(x){
   
@@ -490,9 +554,9 @@ ggplot(subset(saa,qname%in%nms[c(1,7,10,12)]))+
 
 
 ```{r OEM-err, eval=!FALSE}
-library(diags)
+diagsFn=diags:::diagsFn
 
-source('~/Desktop/flr/diags/R/FLdiags/diags-MFCL.R')
+source('/home/laurence/Desktop/flr/diags/R/FLdiags/diags-MFCL.R')
 
 dgs=mdply(mfcl, function(x) diagsMfcl(getOMFiles(x)[1]))
 
@@ -550,9 +614,7 @@ ggplot(dat)+
 
 
 ```{r OEM-cpue0}
-library(mpb)
-
-#source('~/Desktop/flr/mse/R/oem.R')
+source('~/Desktop/flr/mse/R/oem.R')
 
 saa=subset(saa,qname%in%nms[c(1,7,10,12)])
 
@@ -589,6 +651,7 @@ ggplot(mdply(seq(length(u)),function(x) as.data.frame(u[[x]])))+
 # Biomass Dynamic CPUE diagnostics
 
 ```{r OEM-cpue}
+library(mpb)
 load(file.path(dirDat,"TFGO.RData"))
 dgs=diags(bds2[[1]])
 
@@ -616,6 +679,9 @@ ggplot(subset(dgs,!is.na(residual)))+
 
 **Figure `r iFig=iFig+1; iFig`.**  Residuals from fit to CPUE by biomass dynamic assessment model. 
 
+```{r}
+save(dgs,file=file.path(dirDat,"dgs-bd.RData"))
+```
 
 ```{r biodyn-ar, fig.height=6,fig.width=8}
 ggplot(aes(residual,residualLag), data=dgs)+
@@ -653,3 +719,9 @@ ggplot(aes(qqx,qqy), data=dgs)+
 ```
 
 **Figure `r iFig=iFig+1; iFig`.** Quantile Quantile plot of residuals from fit to CPUE by biomass dynamic assessment model
+
+
+
+
+
+
