@@ -1,0 +1,100 @@
+---
+title: "Grid"
+subtitle: "Wavelet Analysis"
+author: "L Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+  
+```{r, knitr, eval=TRUE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(knitr)
+
+opts_chunk$set(comment   =NA, 
+               warning   =FALSE, 
+               message   =FALSE, 
+               error     =FALSE, 
+               echo      =FALSE,
+               fig.width =10, 
+               fig.height=10,
+               cache     =TRUE, 
+               fig.path  ="../tex/gridwave",
+               cache.path="../cache/gridwave/")
+
+iFig=0
+iTab=0
+```
+```{r, libraries}
+library(ggplot2)
+library(wavelets)
+
+library(reshape)
+library(plyr)
+
+library(FLCore)
+library(ggplotFL)
+```
+```{r, dir}
+dirMy="/home/laurence/Desktop/sea++/xval/manuscripts/peerReview/grid"
+dirDat="/media/laurence/Seagate Backup Plus Drive/xfiles/oms"
+```
+```{r, albna}
+load(file.path(dirDat,"bfta","om.RData"))
+
+res=t(ssb(om)[drop=T])
+
+res=res[!apply(res,1,function(x) any(is.na(x))),]
+wtData=NULL
+for (i in 1:nrow(res)) {
+  a     =as.matrix(res[i,])
+  wt    =dwt(a, filter="haar", boundary="periodic")
+  wtData=rbind(wtData, unlist(c(wt@W,wt@V[[wt@level]])))
+  }
+wtData <- as.data.frame(wtData)
+
+# set class labels into categorical values
+classId <- c(rep("1",dim(res)[1]), rep("2",dim(res)[1]), rep("3",dim(res)[1]),
+             rep("4",dim(res)[1]), rep("5",dim(res)[1]), rep("6",dim(res)[1]))
+wtSc <- data.frame(cbind(classId, wtData))
+```
+
+```{r}
+points.matrix=as.matrix(res)
+
+kclusts <- data.frame(k=1:20) %>% group_by(k) %>% do(kclust=kmeans(points.matrix, .$k, nstart=25))
+
+clusters <- kclusts %>% group_by(k) %>% do(tidy(.$kclust[[1]]))
+assignments <- kclusts %>% group_by(k) %>% do(augment(.$kclust[[1]], points.matrix))
+
+clusterings <- kclusts %>% group_by(k) %>% do(glance(.$kclust[[1]]))
+ggplot(clusterings, aes(k, tot.withinss)) + 
+  geom_line()+
+  xlab("Number of Clusters")+ylab("Within SS")+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`** Time series.
+
+
+```{r}
+
+res3=data.frame(clust=kclusts[[2]][[6]]$cluster,iter=seq(dim(res3)[1]),res)
+res3=transform(melt(res3,id=c("clust","iter")),year=as.numeric(variable))
+
+
+```
+
+```{r}
+library(dplyr)
+
+set.seed(2014)
+centers <- data.frame(cluster=factor(1:3), size=c(100, 150, 50), x1=c(5, 0, -3), x2=c(-1, 1, -2))
+points <- centers %>% group_by(cluster) %>%
+    do(data.frame(x1=rnorm(.$size[1], .$x1[1]),
+                  x2=rnorm(.$size[1], .$x2[1])))
+
+library(ggplot2)
+ggplot(points, aes(x1, x2, color=cluster)) + geom_point()
+```
+

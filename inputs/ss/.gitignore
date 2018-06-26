@@ -1,0 +1,8 @@
+run60
+
+# But not these
+!run82/aspm/complex.ctl
+!run82/aspm/complex.dat
+!run82/aspm/forecast.ss
+!run82/aspm/starter.ss
+

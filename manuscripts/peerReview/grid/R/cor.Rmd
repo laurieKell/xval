@@ -1,0 +1,621 @@
+---
+title: "Grid"
+subtitle: "Correlations between summary stats"
+author: " L Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+
+In many of the tRFMO  MSE Operating Models were developed as factorial designs, where scenarios corresponded to a number of factors with levels. For example diffcult to estimate parameters such as steepness and natural mortality were fixed at a range of values and then all the possible combinations run. All the combinations are referred to as the Operating Model grid.
+
+To explore the variablity in the grids a variety of summary statistics were calculated using the Operating Model grids for East Atlantic and Mediterranean bluefin, Indian Ocean albacore and swordfish, and North Atlantic Ocean albacore and swordfish.
+
+Summary statistics include MSY reference points, the production function and current stock status.
+
+So that the main features in the grids could be summarised the correlations between the statistics were then estimated and used to order the statistics into similar groups. As well as using the raw correlations the absolute value of the correlation coefficient were used to group the variables to show the strength of the correlations.
+
+For example **Figure 10** for bluefin shows that in the 2196 bluefin grid there are only 5 main features, namely 
+
+i) steepness and $/beta$ parameter of the stock recruitment relationship
+ii) level of recruitment
+iii) production function
+iv) virgin biomass and $/apha$ parameter of the stock recruitment relationship
+v) Current status
+
+## Acceptace/Rejection of Runs
+
+Need to validate SS assessments i.e.
+
+i) Are parameters actually estimated
+ii) Are parameters such as $r$ and $K$ within bounds
+iii) Has the model converged
+iv) Do residuals met runs tests
+
+
+```{r, knitr, eval=TRUE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(knitr)
+
+opts_chunk$set(comment   =NA, 
+               warning   =FALSE, 
+               message   =FALSE, 
+               error     =FALSE, 
+               echo      =FALSE,
+               fig.width =10, 
+               fig.height=10,
+               cache     =TRUE, 
+               fig.path  ="../tex/cor-",
+               cache.path="../cache/cor/")
+
+iFig=0
+```
+```{r, dir}
+dirMy="/home/laurence/Desktop/sea++/xval/manuscripts/peerReview/grid"
+dirDat="/media/laurence/Seagate Backup Plus Drive/xfiles/oms"
+```
+```{r, pkgs}
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(reshape)
+library(GGally)
+
+library(FLCore)
+library(ggplotFL)
+library(corrplot)
+```
+
+# Correlations
+```{r, bfte}
+load(file.path(dirDat,"bfte","rfs.RData"))
+
+omit=c(grep("f0.1",dimnames(rfs)[[1]]),
+       grep("spr.",dimnames(rfs)[[1]]),
+       grep("fmax",dimnames(rfs)[[1]]),
+       grep("biomass",dimnames(rfs)[[1]]),
+       grep("yield.latest",dimnames(rfs)[[1]]),
+       grep("yield.recent",dimnames(rfs)[[1]]))
+rfs=rfs[-omit]
+rfs["rshift"]=rfs["rshift"]/rfs["rmean"]
+
+corrplot(cor(model.frame(rfs)[,-(dim(rfs)[1]+1)]),order="hclust")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Bluefin correlation matrix.
+
+
+```{r, bfte-abs}
+corrplot(abs(cor(model.frame(rfs)[,-(dim(rfs)[1]+1)])),order="hclust")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Bluefin correlation matrix, absolute values to show relationships
+
+
+```{r, albio}
+load(file.path(dirDat,"albio","rfs.RData"))
+
+omit=c(grep("f0.1",dimnames(rfs)[[1]]),
+       grep("spr.",dimnames(rfs)[[1]]),
+       grep("fmax",dimnames(rfs)[[1]]),
+       grep("biomass",dimnames(rfs)[[1]]),
+       grep("yield.latest",dimnames(rfs)[[1]]),
+       grep("yield.recent",dimnames(rfs)[[1]]))
+rfs=rfs[-omit]
+rfs["rshift"]=rfs["rshift"]/rfs["rmean"]
+
+corrplot(cor(model.frame(rfs)[,-(dim(rfs)[1]+1)]),order="hclust")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Albacore Indian Ocean correlation matrix.
+
+
+```{r, albio-abs}
+corrplot(abs(cor(model.frame(rfs)[,-(dim(rfs)[1]+1)])),order="hclust")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Albacore Indian Ocean correlation matrix, absolute values to show relationships
+
+
+
+```{r, albn}
+load(file.path(dirDat,"albn","rfs.RData"))
+
+rfs=rfs[-omit]
+rfs["rshift"]=rfs["rshift"]/rfs["rmean"]
+
+corrplot(cor(model.frame(rfs)[,-(dim(rfs)[1]+1)]),order="hclust")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Albacore North Atlantic Ocean correlation matrix.
+
+
+```{r, albn-abs}
+corrplot(abs(cor(model.frame(rfs)[,-(dim(rfs)[1]+1)])),order="hclust")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Albacore North Atlantic Ocean correlation matrix, absolute values to show relationships
+
+
+```{r, swoio}
+load(file.path(dirDat,"swoio","rfs.RData"))
+
+omit=c(grep("crash",dimnames(rfs)[[1]]),
+       grep("f0.1",dimnames(rfs)[[1]]),
+       grep("spr.",dimnames(rfs)[[1]]),
+       grep("fmax",dimnames(rfs)[[1]]),
+       grep("biomass",dimnames(rfs)[[1]]),
+       grep("yield.latest",dimnames(rfs)[[1]]),
+       grep("yield.recent",dimnames(rfs)[[1]]))
+rfs=rfs[-omit]
+
+rfs["rshift"]=rfs["rshift"]/rfs["rmean"]
+
+corrplot(cor(model.frame(rfs)[,-(dim(rfs)[1]+1)],use="pairwise.complete.obs"),order="hclust")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Swordfish Indian Ocean correlation matrix.
+
+
+```{r, swoio-abs}
+corrplot(abs(cor(model.frame(rfs)[,-(dim(rfs)[1]+1)],use="pairwise.complete.obs")),order="hclust")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Swordfish Indian Ocean correlation matrix, absolute values to show relationships
+
+
+```{r, swon}
+load(file.path(dirDat,"swon","rfs.RData"))
+
+omit=c(grep("f0.1",dimnames(rfs)[[1]]),
+       grep("spr.",dimnames(rfs)[[1]]),
+       grep("fmax",dimnames(rfs)[[1]]),
+       grep("biomass",dimnames(rfs)[[1]]),
+       grep("yield.latest",dimnames(rfs)[[1]]),
+       grep("yield.recent",dimnames(rfs)[[1]]))
+rfs=rfs[-omit]
+rfs["rshift"]=rfs["rshift"]/rfs["rmean"]
+
+corrplot(cor(model.frame(rfs)[,-(dim(rfs)[1]+1)]),order="hclust")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Swordfish North Atlantic Ocean correlation matrix.
+
+
+```{r, swon-abs}
+corrplot(abs(cor(model.frame(rfs)[,-(dim(rfs)[1]+1)])),order="hclust")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Swordfish North Atlantic Ocean correlation matrix, absolute values to show relationships
+
+\newpage
+# Clusters
+
+```{r, bfte-cluster, fig.height=3}
+theme_set(theme_bw())
+
+load(file.path(dirDat,"bfte","rfs.RData"))
+
+omit=c(grep("crash",dimnames(rfs)[[1]]),
+       grep("f0.1",dimnames(rfs)[[1]]),
+       grep("spr.",dimnames(rfs)[[1]]),
+       grep("fmax",dimnames(rfs)[[1]]),
+       grep("biomass",dimnames(rfs)[[1]]),
+       grep("yield.latest",dimnames(rfs)[[1]]),
+       grep("yield.recent",dimnames(rfs)[[1]]))
+rfs=rfs[-omit]
+
+rfs["rshift"]=rfs["rshift"]/rfs["rmean"]
+
+clst=model.frame(rfs)[,-(dim(rfs)[1]+1)]
+clst=na.omit(clst) # listwise deletion of missing
+clst=scale(clst) # standardize variables 
+
+# Determine number of clusters
+wss=(nrow(clst)-1)*sum(apply(clst,2,var))
+for (i in 2:15) 
+  wss[i]=sum(kmeans(clst,centers=i)$withinss)
+
+ggplot(aes(nclus,wss),data=data.frame(nclus=1:15,wss=wss))+
+  geom_line()+
+  geom_point()+
+  xlab("Number of Clusters")+
+  ylab("Within groups sum of squares") 
+```
+
+**Figure `r iFig=iFig+1; iFig`** Bluefin cluster selection.
+
+
+```{r, bfte-cluster2, fig.height=5}
+# K-Means Cluster Analysis  
+fit = kmeans(clst, 5) # 5 cluster solution
+# get cluster means
+mn=aggregate(clst,by=list(fit$cluster),FUN=mean)
+# append cluster assignment
+clst=data.frame(clst, fit$cluster)   
+
+# Ward Hierarchical Clustering
+d = dist(clst, method = "euclidean") # distance matrix
+fit = hclust(d, method="ward")
+
+plot(fit,axes=FALSE,labels=FALSE) # display dendogram
+groups = cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red") 
+
+save(clst,file=file.path(dirDat,"bfte","clst.RData"),compress="xz")
+```
+**Figure `r iFig=iFig+1; iFig`** Bluefin Clusters
+
+
+```{r, bfte-cluster3, fig.height=4}
+theme_set(theme_bw())
+ggplot(melt(clst[,c(21,20,22,27,13:14,16,12,29,2,17,25,1)],id="fit.cluster"))+
+   geom_hline(aes(yintercept=0))+
+   geom_boxplot(aes(x=factor(fit.cluster),y=value,fill=factor(fit.cluster)))+
+   facet_wrap(~variable,scale="free")+
+   theme(legend.position="none")+
+   xlab("")+ylab("Cluster")
+
+```
+**Figure `r iFig=iFig+1; iFig`** Bluefin Clusters
+
+\newpage
+```{r, albio-cluster, fig.height=2}
+theme_set(theme_bw())
+
+load(file.path(dirDat,"albio","rfs.RData"))
+
+omit=c(grep("crash",dimnames(rfs)[[1]]),
+       grep("f0.1",dimnames(rfs)[[1]]),
+       grep("spr.",dimnames(rfs)[[1]]),
+       grep("fmax",dimnames(rfs)[[1]]),
+       grep("biomass",dimnames(rfs)[[1]]),
+       grep("yield.latest",dimnames(rfs)[[1]]),
+       grep("yield.recent",dimnames(rfs)[[1]]))
+rfs=rfs[-omit]
+
+rfs["rshift"]=rfs["rshift"]/rfs["rmean"]
+
+clst=model.frame(rfs)[,-(dim(rfs)[1]+1)]
+clst=na.omit(clst) # listwise deletion of missing
+clst=scale(clst) # standardize variables 
+
+# Determine number of clusters
+wss=(nrow(clst)-1)*sum(apply(clst,2,var))
+for (i in 2:15) 
+  wss[i]=sum(kmeans(clst,centers=i)$withinss)
+
+ggplot(aes(nclus,wss),data=data.frame(nclus=1:15,wss=wss))+
+  geom_line()+
+  geom_point()+
+  xlab("Number of Clusters")+
+  ylab("Within groups sum of squares") 
+```
+
+**Figure `r iFig=iFig+1; iFig`** Albacore Indian Ocean cluster selection.
+
+
+```{r, albio-cluster2, fig.height=5}
+# K-Means Cluster Analysis  
+fit = kmeans(clst, 5) # 5 cluster solution
+# get cluster means
+mn=aggregate(clst,by=list(fit$cluster),FUN=mean)
+# append cluster assignment
+clst=data.frame(clst, fit$cluster)   
+
+# Ward Hierarchical Clustering
+d = dist(clst, method = "euclidean") # distance matrix
+fit = hclust(d, method="ward")
+
+plot(fit,axes=FALSE,labels=FALSE) # display dendogram
+groups = cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red") 
+
+save(clst,file=file.path(dirDat,"albio","clst.RData"),compress="xz")
+```
+**Figure `r iFig=iFig+1; iFig`** Albacore Indian Ocean Clusters
+
+
+```{r, albio-cluster3, fig.height=4}
+theme_set(theme_bw())
+ggplot(melt(clst[,c(21,20,22,27,13:14,16,12,29,2,17,25,1)],id="fit.cluster"))+
+   geom_hline(aes(yintercept=0))+
+   geom_boxplot(aes(x=factor(fit.cluster),y=value,fill=factor(fit.cluster)))+
+   facet_wrap(~variable,scale="free")+
+   theme(legend.position="none")+
+   xlab("")+ylab("Cluster")
+
+```
+*Figure `r iFig=iFig+1; iFig`** Albacore Indian Ocean Clusters
+
+\newpage
+```{r, albn-cluster, fig.height=3}
+theme_set(theme_bw())
+
+load(file.path(dirDat,"albn","rfs.RData"))
+
+omit=c(grep("crash",dimnames(rfs)[[1]]),
+       grep("f0.1",dimnames(rfs)[[1]]),
+       grep("spr.",dimnames(rfs)[[1]]),
+       grep("fmax",dimnames(rfs)[[1]]),
+       grep("biomass",dimnames(rfs)[[1]]),
+       grep("yield.latest",dimnames(rfs)[[1]]),
+       grep("yield.recent",dimnames(rfs)[[1]]))
+rfs=rfs[-omit]
+
+rfs["rshift"]=rfs["rshift"]/rfs["rmean"]
+
+clst=model.frame(rfs)[,-(dim(rfs)[1]+1)]
+clst=na.omit(clst) # listwise deletion of missing
+clst=scale(clst) # standardize variables 
+
+# Determine number of clusters
+wss=(nrow(clst)-1)*sum(apply(clst,2,var))
+for (i in 2:15) 
+  wss[i]=sum(kmeans(clst,centers=i)$withinss)
+
+ggplot(aes(nclus,wss),data=data.frame(nclus=1:15,wss=wss))+
+  geom_line()+
+  geom_point()+
+  xlab("Number of Clusters")+
+  ylab("Within groups sum of squares") 
+```
+
+**Figure `r iFig=iFig+1; iFig`** Albacore North Atlantic Ocean cluster selection.
+
+```{r, albn-cluster2, fig.height=5}
+# K-Means Cluster Analysis  
+fit = kmeans(clst, 5) # 5 cluster solution
+# get cluster means
+mn=aggregate(clst,by=list(fit$cluster),FUN=mean)
+# append cluster assignment
+clst=data.frame(clst, fit$cluster)   
+
+# Ward Hierarchical Clustering
+d = dist(clst, method = "euclidean") # distance matrix
+fit = hclust(d, method="ward")
+
+plot(fit,axes=FALSE,labels=FALSE) # display dendogram
+groups = cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red") 
+
+save(clst,file=file.path(dirDat,"albn","clst.RData"),compress="xz")
+```
+**Figure `r iFig=iFig+1; iFig`** Albacore North Atlantic Ocean Clusters
+
+```{r, albn-cluster3, fig.height=4}
+theme_set(theme_bw())
+ggplot(melt(clst[,c(21,20,22,27,13:14,16,12,29,2,17,25,1)],id="fit.cluster"))+
+   geom_hline(aes(yintercept=0))+
+   geom_boxplot(aes(x=factor(fit.cluster),y=value,fill=factor(fit.cluster)))+
+   facet_wrap(~variable,scale="free")+
+   theme(legend.position="none")+
+   xlab("")+ylab("Cluster")
+
+```
+**Figure `r iFig=iFig+1; iFig`** Albacore North Atlantic Ocean Clusters
+
+\newpage
+```{r, swoio-cluster, fig.height=3}
+theme_set(theme_bw())
+
+load(file.path(dirDat,"swoio","rfs.RData"))
+
+omit=c(grep("crash",dimnames(rfs)[[1]]),
+       grep("f0.1",dimnames(rfs)[[1]]),
+       grep("spr.",dimnames(rfs)[[1]]),
+       grep("fmax",dimnames(rfs)[[1]]),
+       grep("biomass",dimnames(rfs)[[1]]),
+       grep("yield.latest",dimnames(rfs)[[1]]),
+       grep("yield.recent",dimnames(rfs)[[1]]))
+rfs=rfs[-omit]
+
+rfs["rshift"]=rfs["rshift"]/rfs["rmean"]
+
+clst=model.frame(rfs)[,-(dim(rfs)[1]+1)]
+clst=na.omit(clst) # listwise deletion of missing
+clst=scale(clst) # standardize variables 
+
+# Determine number of clusters
+wss=(nrow(clst)-1)*sum(apply(clst,2,var))
+for (i in 2:15) 
+  wss[i]=sum(kmeans(clst,centers=i)$withinss)
+
+ggplot(aes(nclus,wss),data=data.frame(nclus=1:15,wss=wss))+
+  geom_line()+
+  geom_point()+
+  xlab("Number of Clusters")+
+  ylab("Within groups sum of squares") 
+```
+
+**Figure `r iFig=iFig+1; iFig`** Swordfish Indian Ocean cluster selection.
+
+
+```{r, swoio-cluster2, fig.height=5}
+# K-Means Cluster Analysis  
+fit = kmeans(clst, 5) # 5 cluster solution
+# get cluster means
+mn=aggregate(clst,by=list(fit$cluster),FUN=mean)
+# append cluster assignment
+clst = data.frame(clst, fit$cluster)   
+
+# Ward Hierarchical Clustering
+d = dist(clst, method = "euclidean") # distance matrix
+fit = hclust(d, method="ward")
+
+plot(fit,axes=FALSE,labels=FALSE,sub=NULL) # display dendogram
+groups = cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red") 
+
+save(clst,file=file.path(dirDat,"swoio","clst.RData"),compress="xz")
+```
+**Figure `r iFig=iFig+1; iFig`** Swordfish Indian Ocean Clusters
+
+```{r, swoio-cluster3, fig.height=4}
+theme_set(theme_bw())
+ggplot(melt(clst[,c(21,20,22,27,13:14,16,12,29,2,17,25,1)],id="fit.cluster"))+
+   geom_hline(aes(yintercept=0))+
+   geom_boxplot(aes(x=factor(fit.cluster),y=value,fill=factor(fit.cluster)))+
+   facet_wrap(~variable,scale="free")+
+   theme(legend.position="none")+
+   xlab("")+ylab("Cluster")
+
+```
+**Figure `r iFig=iFig+1; iFig`** Swordfish Indian Ocean Clusters
+
+\newpage
+```{r, swon-cluster, fig.height=3}
+theme_set(theme_bw())
+
+load(file.path(dirDat,"swon","rfs.RData"))
+
+omit=c(grep("crash",dimnames(rfs)[[1]]),
+       grep("f0.1",dimnames(rfs)[[1]]),
+       grep("spr.",dimnames(rfs)[[1]]),
+       grep("fmax",dimnames(rfs)[[1]]),
+       grep("biomass",dimnames(rfs)[[1]]),
+       grep("yield.latest",dimnames(rfs)[[1]]),
+       grep("yield.recent",dimnames(rfs)[[1]]))
+rfs=rfs[-omit]
+
+rfs["rshift"]=rfs["rshift"]/rfs["rmean"]
+
+clst=model.frame(rfs)[,-(dim(rfs)[1]+1)]
+clst=na.omit(clst) # listwise deletion of missing
+clst=scale(clst) # standardize variables 
+
+# Determine number of clusters
+wss=(nrow(clst)-1)*sum(apply(clst,2,var))
+for (i in 2:15) 
+  wss[i]=sum(kmeans(clst,centers=i)$withinss)
+
+ggplot(aes(nclus,wss),data=data.frame(nclus=1:15,wss=wss))+
+  geom_line()+
+  geom_point()+
+  xlab("Number of Clusters")+
+  ylab("Within groups sum of squares") 
+```
+
+**Figure `r iFig=iFig+1; iFig`** Swordfish North Atlantic Ocean cluster selection.
+
+
+```{r, swon-cluster2, fig.height=5}
+# K-Means Cluster Analysis  
+fit = kmeans(clst, 5) # 5 cluster solution
+# get cluster means
+mn=aggregate(clst,by=list(fit$cluster),FUN=mean)
+# append cluster assignment
+clst=data.frame(clst, fit$cluster)   
+
+# Ward Hierarchical Clustering
+d = dist(clst, method = "euclidean") # distance matrix
+fit = hclust(d, method="ward")
+
+plot(fit,axes=FALSE,labels=FALSE) # display dendogram
+groups = cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red") 
+
+save(clst,file=file.path(dirDat,"swon","clst.RData"),compress="xz")
+```
+**Figure `r iFig=iFig+1; iFig`** Swordfish North Atlantic Ocean Clusters
+
+```{r, swon-cluster3, fig.height=4}
+theme_set(theme_bw())
+ggplot(melt(clst[,c(21,20,22,27,13:14,16,12,29,2,17,25,1)],id="fit.cluster"))+
+   geom_hline(aes(yintercept=0))+
+   geom_boxplot(aes(x=factor(fit.cluster),y=value,fill=factor(fit.cluster)))+
+   facet_wrap(~variable,scale="free")+
+   theme(legend.position="none")+
+   xlab("")+ylab("Cluster")
+```
+**Figure `r iFig=iFig+1; iFig`** Swordfish North Atlantic Ocean Clusters
+
+ 
+\newpage
+# Time Series
+
+```{r, bfte-ts-ssb, fig.height=4}
+load(file.path(dirDat,"bfte","om.RData"))
+ggplot(as.data.frame(ssb(om)))+
+  geom_line(aes(year,data,group=iter),col="grey50",alpha=0.2)
+```
+
+**Figure `r iFig=iFig+1; iFig`** Bluefin SSB
+
+```{r, bfte-ts-rec, fig.height=4}
+ggplot(as.data.frame(rec(om)))+
+  geom_line(aes(year,data,group=iter),col="grey50",alpha=0.2)
+```
+
+**Figure `r iFig=iFig+1; iFig`** Bluefin recruits
+
+
+\newpage
+```{r, albio-ts-ssb, fig.height=4}
+load(file.path(dirDat,"albio","om.RData"))
+ggplot(as.data.frame(ssb(om)))+
+  geom_line(aes(year,data,group=iter),col="grey50",alpha=0.2)
+```
+
+**Figure `r iFig=iFig+1; iFig`** Albacore Indian Ocean SSB
+
+```{r, albio-ts-rec, fig.height=4}
+ggplot(as.data.frame(rec(om)))+
+  geom_line(aes(year,data,group=iter),col="grey50",alpha=0.2)
+```
+
+**Figure `r iFig=iFig+1; iFig`** Albacore Indian Ocean recruits
+
+\newpage
+```{r, albn-ts-ssb, fig.height=4}
+load(file.path(dirDat,"albn","om.RData"))
+ggplot(as.data.frame(ssb(om)))+
+  geom_line(aes(year,data,group=iter),col="grey50",alpha=0.2)
+```
+
+**Figure `r iFig=iFig+1; iFig`** Albacore North Atlantic Ocean SSB
+
+```{r, albn-ts-rec, fig.height=4}
+ggplot(as.data.frame(rec(om)))+
+  geom_line(aes(year,data,group=iter),col="grey50",alpha=0.2)
+```
+
+**Figure `r iFig=iFig+1; iFig`** Albacore North Atlantic Ocean recruits
+
+
+\newpage
+```{r, swio-ts-ssb, fig.height=4}
+load(file.path(dirDat,"swoio","om.RData"))
+ggplot(as.data.frame(ssb(om)))+
+  geom_line(aes(year,data,group=iter),col="grey50",alpha=0.2)
+```
+
+**Figure `r iFig=iFig+1; iFig`** Swordfish Indian Ocean SSB
+
+```{r, swio-ts-rec, fig.height=4}
+ggplot(as.data.frame(rec(om)))+
+  geom_line(aes(year,data,group=iter),col="grey50",alpha=0.2)
+```
+
+**Figure `r iFig=iFig+1; iFig`** Swordfish Indian Ocean recruits
+
+\newpage
+```{r, swon-ts-ssb, fig.height=4}
+load(file.path(dirDat,"swon","om.RData"))
+ggplot(subset(as.data.frame(ssb(om)),!is.na(data)&unit=="F"))+
+  geom_line(aes(year,data,group=iter),col="grey50",alpha=0.2)
+```
+
+**Figure `r iFig=iFig+1; iFig`** Swordfish North Atlantic Ocean SSB
+
+```{r, swon-ts-rec, fig.height=4}
+ggplot(subset(as.data.frame(rec(om)),!is.na(data)&unit=="F"))+
+  geom_line(aes(year,data,group=iter),col="grey50",alpha=0.2)
+```
+
+**Figure `r iFig=iFig+1; iFig`** Swordfish North Atlantic Ocean Recruits

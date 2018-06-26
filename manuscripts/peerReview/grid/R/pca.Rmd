@@ -1,0 +1,127 @@
+---
+title: "Grid"
+subtitle: "Summary Statistics"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+vignette: >
+  %\VignetteIndexEntry{FLife
+  %\VignetteEngine{knitr::rmarkdown
+  \usepackage[utf8]{inputenc
+github_document:
+    mathjax: TRUE
+tags: FLife FLR
+license: Creative Commons Attribution-ShareAlike 4.0 International Public License
+---
+
+```{r knitr_init, echo=FALSE, results="hide"}
+library(knitr)
+## Global options
+opts_chunk$set(cache     =TRUE,
+               echo      =FALSE,
+               eval      =TRUE,
+               prompt    =FALSE,
+               comment   =NA,
+               message   =FALSE,
+               warning   =FALSE,
+               tidy      =FALSE,
+               fig.height=6,
+               fig.width =8)
+
+options(digits=3)
+
+iFig=0
+```
+```{r, pkgs}
+library(corrplot)
+library(ggplot2)
+
+library(plyr)
+library(dplyr)
+
+library(reshape)
+```
+```{r, dir}
+dirMy ="/home/laurence/Desktop/sea++/xval/manuscripts/peerReview/grid"
+dirDat="/media/laurence/Seagate Backup Plus Drive/xfiles/oms"
+```
+```{r, data}
+load(file.path(dirDat,"albio","rfs.RData"))
+all=data.frame(stock="albio",rfs)
+load(file.path(dirDat,"albna","rfs.RData"))
+rfs=transform(model.frame(rfs)[,-55],
+              s=s.current/s.msy,
+              f=f.current/f.msy,
+              sh=s.msy/s.virgin,
+              v=s.current/s.virgin)
+rfs=data.frame(stock="albna",rfs)
+all=rbind(all,rfs)
+load(file.path(dirDat,"swon","rfs.RData"))
+rfs=transform(model.frame(rfs)[,-55],
+              s=s.current/s.msy,
+              f=f.current/f.msy,
+              sh=s.msy/s.virgin,
+              v=s.current/s.virgin)
+rfs=data.frame(stock="swona",rfs)
+all=rbind(all,rfs)
+#load(file.path(dirDat,"swoio","rfs.RData"))
+#rfs=data.frame(stock="swio",rfs)
+#all=rbind(all,rfs)
+load(file.path(dirDat,"bfta","rfs.RData"))
+rfs=transform(model.frame(rfs)[,-55],
+              s=s.current/s.msy,
+              f=f.current/f.msy,
+              sh=s.msy/s.virgin,
+              v=s.current/s.virgin)
+rfs=data.frame(stock="bfta",rfs)
+all=rbind(all,rfs)
+```
+
+```{r}
+corrplot(abs(cor(all[,-1],use="pairwise.complete.obs")),order="hclust")
+```
+
+```{r}
+cr=model.frame(rfs)[c("f.msy","s.msy","y.msy",
+                      "r","sh",
+                      "f.current","s.current","r.current",
+                      "s","f","v")]
+
+corrplot(cor(cr),order="hclust")
+```
+
+```{r pca-smrystats-1,fig.width=5,fig.height=5}
+pc=princomp(cr,cor=T)
+plot(pc)
+```
+
+**Figure `r i=i+1; i`,** Principle components I
+
+```{r pca-smrystats-2,fig.width=6,fig.height=4}
+biplot(pc,choices=1:2)+
+  theme_bw()
+```
+
+**Figure `r i=i+1; i`,** Principle components II
+
+```{r pca-smrystats-3,fig.width=5,fig.height=5}
+ggplot(cbind(resF[,1:7],ggbiplot(pc)$data))+
+  geom_point(aes(xvar,yvar,fill=as.factor(sel)),size=4,shape=21)+
+  guides(fill=guide_legend(title="Selection"))+
+  theme_bw()+xlab("1st Principal Component")+ylab("2nd Principal Component")+
+  theme(legend.position="bottom")
+```
+
+**Figure `r i=i+1; i`,** Plotof scenarios by 1st and 2nd principal components.
+
+
+```{r pca-smrystats-4,fig.height=8,fig.width=6}
+ggplot(cbind(resF[,1:7],ggbiplot(pc)$data))+
+  geom_point(aes(xvar,yvar,fill=as.factor(sel)),size=4,shape=21)+
+  facet_grid(M~ess)+
+  guides(fill=guide_legend(title="Selection"))+
+  theme_bw()+xlab("1st Principal Component")+ylab("2nd Principal Component")+
+  theme(legend.position="bottom")
+pc=cbind(resF[,1:7],ggbiplot(pc)$data)
+save(pc,file=file.path(dirBC,"data","pc.RData"))
+```
+
