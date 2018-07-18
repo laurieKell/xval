@@ -102,6 +102,12 @@ plot(oms)+
 ```
 **Figure `r iFig=iFig+1;iFig`.** Operating Models
 
+```{r}
+res=laply(eqls, function(x) refpts(x)["msy","ssb"]/refpts(x)["virgin","ssb"])
+p(FLPar(array(res,c(1,500))))
+
+```
+
 
 ```{r xtest-80}
 library(stringr)

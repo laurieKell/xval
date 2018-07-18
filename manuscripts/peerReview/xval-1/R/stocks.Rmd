@@ -1,0 +1,131 @@
+---
+title: "Bluefin" 
+subtitle: "Runs"
+author: "Laurence Kell"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: rmarkdown:::pdf_document
+vignette: >
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEncoding{UTF-8}
+tags: FLPKG FLR
+license: Creative Commons Attribution-ShareAlike 4.0 International
+---
+  
+
+```{r knitr_init, echo=FALSE, results="hide"}
+library(knitr)
+## Global options
+opts_chunk$set(echo    =FALSE,
+               eval    =TRUE,
+               cache   =!FALSE,
+               cache.path="../cache/om/",
+               prompt  =FALSE,
+               comment =NA,
+               message =FALSE,
+               tidy    =FALSE,
+               warning =FALSE,
+               fig.height=6,
+               fig.width =8,
+               fig.path  ="../tex/om-")
+
+iFig=0
+```
+```{r, pkgs, echo=FALSE, message=FALSE}
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+
+library(GGally)
+library(corrplot)
+
+library(qicharts2)
+
+library(ggplotFL)
+library(FLRP)
+library(diags)
+library(r4ss)
+library(ss3om)
+
+library(gam)
+
+options(digits=3)
+```
+```{r, dirs, echo=FALSE, message=FALSE}
+dirMy=dirname(dirname(FLife:::getScriptPath()))
+dirInp="/home/laurence/Desktop/sea++/xval/inputs/ss"
+dirDat=file.path(dirMy,"data")
+dirBase=file.path(dirInp,"base")
+```
+
+
+```{r, data-stk}
+om=FLStocks(mlply(expand.grid(run=c("run59","run82"),scen=c("base","aspm","aspm-rec")), 
+                function(run,scen) readFLSss3(file.path(dirInp,run,scen))))
+```
+
+```{r, dgs}
+source('~/Desktop/flr/diags/R/diags-SS.R')
+
+diagsFn=diags:::diagsFn
+
+dgs=mdply(expand.grid(run=c("run59","run82"),scen=c("base","aspm","aspm-rec")), 
+                function(run,scen) .diagUss(file.path(dirInp,run,scen)))
+
+dgs$scenario=c("base","aspm","aspm-len")[dgs$X1]
+dgs=dgs[,c(11,2:10)]
+
+qgs=ddply(dgs,.(run,scen), with, 
+          {res=qic(year,residual,facet=~name,chart="i")$data
+          attributes(res)$class="data.frame"
+          res})
+```
+
+\newpage
+# Figures
+```{r, flstock, fig.height=9}
+theme_set(theme_bw())
+
+ggplot(ldply(om,function(x) plot(x)$data))+
+  geom_line(aes(year,data,col=scen))+
+  facet_grid(qname~run,scale="free")+
+  xlab("Year")+ylab("")+
+  guides(col=guide_legend(title="Scenario"))+
+  theme_bw()
+```
+**Figure `r iFig=iFig+1; iFig`** Time series of recruitment, SSB, catch and fishing mortality.
+
+
+\begin{landscape}
+```{r, residuals, fig.width=10,fig.height=8}
+theme_set(theme_bw())
+
+ggplot(aes(x,y,col=scen),data=qgs)+
+  geom_point()+
+  geom_smooth(se=FALSE,span=1)+
+  facet_grid(run~facet1,scale="free",space="free")+
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  scale_x_continuous(breaks=seq(1950,2010,10))
+```
+
+**Figure `r iFig=iFig+1; iFig`** Residuals
+\end{landscape}
+
+## Software
+All analysis was conducted using R and FLR and the `diags` package which provides a set of common methods for reading these data into R, plotting and summarising them.(http://www.flr-project.org/)
+
+* `r version$version.string`
+* FLCore: `r packageVersion('FLCore')`
+* diags: `r # packageVersion('diags')`
+* ggplotFL: `r # packageVersion('ggplotFL')`
+* diags: `r # packageVersion('diags')`
+* r4ss: `r # packageVersion('r4ss')`
+
+* **Compiled**: `r date()`
+
+## Author information
+
+**Laurence KELL**. laurie@kell.es
+
+# References {#References}

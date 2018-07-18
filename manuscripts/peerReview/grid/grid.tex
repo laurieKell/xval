@@ -1,0 +1,112 @@
+\documentclass[a4paper,10pt]{article}
+%\documentclass[a4paper,10pt]{scrartcl}
+
+\usepackage[utf8]{inputenc}
+
+\title{Update onCross Validation Papers}
+\author{Laurence Kell, Rishi Sharma, Carolina Minte-Vera}
+\date{\today	}
+
+\pdfinfo{%
+  /Title    ()
+  /Author   ()
+  /Creator  ()
+  /Producer ()
+  /Subject  ()
+  /Keywords ()
+}
+
+\begin{document}
+\maketitle
+
+
+\section*{Parsimonious OM Grid}
+
+\begin{itemize}
+ \item When conducting Management Strategy Evaluation using an Operating Model conditioned on a stock assessment often a full factorial design is used based on scenarios reflecting uncertainty in difficult to estimate parameters, data weights and model specification. 
+ \item The aim of this paper is to evaluate the use of more parsimonious designs using the OM grids developed for Atlantic bluefin tuna, North Atlantic and Indian Oceans albacore and swordfish. 
+ \item The Operating Models are grouped into clusters based on their i) summary statistics (e.g. production functions,reference points and current status) and ii) time series. 
+ \item If the performance of a MP depends on i) summary or ii) time series then it is only neccessary to run a limited number of OM from each cluster. 
+ \item This hypothesis is tested by performing a cross validation where an OM is selected from each cluster and a MSE conducted. This is then repeated for another set of OMs by cluster and the performance of the MPs compared.    
+\end{itemize}
+
+\newpage	
+\subsection*{To Do}
+
+\begin{description}
+ \item[Rishi \& Iago] ~
+ \begin{itemize}
+  \item Provide OM grids for IOALB, IOSWO, NAALB, NASWO and EABFT.
+ \end{itemize}
+
+  \item[Laurie] ~
+  \begin{itemize}
+  \item Look at correlations between summary statistics
+  \item Implement an emprical and model based MP
+ \end{itemize}
+
+ 
+  \item[Laurie \& Rishi] ~
+  \begin{itemize}
+  \item Look at correlations between time series
+ \end{itemize}
+ 
+ \item[Polina] ~
+  \begin{itemize}
+  \item  Create Table summarising grids
+ \end{itemize}
+
+ \item[Iago] ~
+  \begin{itemize}
+  \item  Run MSE
+  \item select 1 OM from each cluster
+  \item run the MSE and summarise results
+  \item select another OM from each cluster and 
+  \item compare the results if they are the same then we dont need to run all OMs
+ \end{itemize}
+
+\end{description}
+
+\end{document}
+
+\newpage
+\section*{Short and Long Term Prediction Skill}
+
+
+\begin{itemize}
+ \item Use cross validation to evaluate overfitting and hindcasting to evaluate prediction skill for emprical and model based Management Procedures and Operating Models conditioned using a stock assessment paradigm.
+ \item When conducting Management Strategy Evaluation the stock assessment in the Management Procedure is intended to provide advice in the short term, while the Operating Model is designed to characterise uncertainty in the long term. In the former case there is requirement for good short term prediction skill and in the later case, when conditioning an Operating Model using a stock assessment paradigm,  good long term prediction skill. 
+ \item Of particular concern when conditioining an Operating Model is that the past may not represent the future. To date two ways have been used to deal with this: either expand the level of uncertainty moving forwards compared to the past, or to invoke Exceptional Circumstances and revise the Management Procedure if future data turn out to be outside the range considered in the trials upon which the Management Procedure had been selected. In the former if quotas are set based on risk then this will result in a reduction in yield while in the later there is a danger of invoking Exceptional Circumstances when the Management Procedure produces an unpalatable result and also negating one of the reasons for conducting Management Strategy Evaluation which is to reduce the frequency of stock assessments.   
+ \item Poor prediction skill can result from overfitting where the model is able to describe the past but has poor ability in forecasting. Therefore a more rigorous way is to perform cross validation to test the prediction skill of a model using a set of data not used when fitting. There is often insufficient data, however, in stock assessment datasets to allow some of it to be kept back for testing. A more sophisticated way to create test datasets is, like the jackknife, to leave out one (or more) observation at a time. Cross validation then allows prediction residuals to be calculated, i.e. the difference between fitted and predicted values where the later is calculated from the out-of-sample predictions. A comparison of the variance of the model and prediction residuals can be used to identify over fitting.
+ %\item In the long term prediction skill depends on knowledge about productivity and recruitment, while in the short term prediction skill depends on how acurately current status, reference points and recent year-classes are estimated.
+ \item Prediction skill in the future can be evaluated by use of a hindcast where a model is fitted to the first part of a time series and then projected over the period omitted in the original fit. Prediction skill is then evaluated by comparing the projections ($\hat{Y}_t$) with observations ($Y_t$) at time $t$ for a given horizon ($h$) using the Mean Absolute Scaled Error\\  
+$MASE={\frac {\sum _{t=1}^{T} \left|Y_t-\hat{Y}_t \right|}{{\frac {T}{T-h}}\sum _{t=h}^{T}\left|Y_{t}-Y_{t-h}\right|}}$ 
+\end{itemize}
+
+
+ \item A variety of approaches have been used for short term forecasting, methods include Support Vector Regression (SVR), an autoregressive integrated moving average (ARIMA) model and a multivariate adaptive regression spline (MARS).
+\newpage
+\subsection*{To Do}
+
+\begin{description}
+  \item[Rishi] ~
+  \begin{itemize}
+    \item Set up SS grid for North Atlantic swordfish Operating Model.
+    \item Implement and run hindcast and cross-validation for Operating Model.
+  \end{itemize}
+
+  \item[Laurie] ~
+  \begin{itemize}
+    \item Set up empirical and model based Management Procedures
+    \item Perform a cross test using Operating Model grid, i.e. run OEM without feedback and estimate population status for 1,2,...n years 
+  \end{itemize}
+ 
+  \item[Laurie \& Rishi] ~
+  \begin{itemize}
+    \item Summarise prediction skill of Operating Model, i.e. how do hindcasts compare with observations
+    \item Summarise prediction skill Management Procedures, i.e. how does estimated stock status from Management Proceedure compare to that from Operating Model 
+  \end{itemize}
+\end{description}
+ 
+
+\end{document}
